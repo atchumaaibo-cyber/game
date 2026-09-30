@@ -1,0 +1,111 @@
+{
+  "source": "Y:\\90_3d\\3Dモデル制作\\プードル\\G5_動き\\プードル_g5_v01_動き.blend",
+  "glb": "poodle.glb",
+  "glb_mb": 12.53,
+  "armature": "Poodle_rig",
+  "bones": 20,
+  "extra_bones": [
+    "ear.L",
+    "ear.R",
+    "tail"
+  ],
+  "rest_pose": "T",
+  "arm_max_deg": null,
+  "meshes": [
+    "Poodle_body",
+    "Poodle_head"
+  ],
+  "triangles": 155434,
+  "shape_keys": [],
+  "height_blender_units": 1.903,
+  "foot_z": -0.952,
+  "actions": [
+    {
+      "name": "idle",
+      "frames": [
+        1,
+        48
+      ]
+    },
+    {
+      "name": "walk",
+      "frames": [
+        1,
+        31
+      ]
+    },
+    {
+      "name": "walk_root",
+      "frames": [
+        1,
+        91
+      ]
+    },
+    {
+      "name": "wave",
+      "frames": [
+        1,
+        48
+      ]
+    }
+  ],
+  "fps": 24,
+  "images": {
+    "poodle_body_base": [
+      2048,
+      2048
+    ],
+    "poodle_head_base": [
+      2048,
+      2048
+    ],
+    "poodle_face_e0_m0": [
+      1024,
+      1024
+    ],
+    "poodle_face_e1_m0": [
+      1024,
+      1024
+    ],
+    "poodle_face_e0_m1": [
+      1024,
+      1024
+    ],
+    "poodle_face_e1_m1": [
+      1024,
+      1024
+    ],
+    "poodle_face_e0_m2": [
+      1024,
+      1024
+    ],
+    "poodle_face_e1_m2": [
+      1024,
+      1024
+    ],
+    "poodle_face_e0_m3": [
+      1024,
+      1024
+    ],
+    "poodle_face_e1_m3": [
+      1024,
+      1024
+    ],
+    "poodle_face_e0_m4": [
+      1024,
+      1024
+    ],
+    "poodle_face_e1_m4": [
+      1024,
+      1024
+    ],
+    "poodle_face_e0_m5": [
+      1024,
+      1024
+    ],
+    "poodle_face_e1_m5": [
+      1024,
+      1024
+    ]
+  }
+}

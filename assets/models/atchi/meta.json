@@ -1,0 +1,108 @@
+{
+  "source": "Y:\\90_3d\\3Dモデル制作\\あっち制作\\作業\\2026-09-29_互換化\\atchi_互換_v03.blend",
+  "glb": "atchi.glb",
+  "glb_mb": 7.35,
+  "armature": "Atchi_rig",
+  "bones": 17,
+  "extra_bones": [],
+  "rest_pose": "A",
+  "arm_max_deg": 0,
+  "meshes": [
+    "Atchi_Body_LowTrial",
+    "Atchi_Head_Preserved"
+  ],
+  "triangles": 102580,
+  "shape_keys": [
+    "Eye_relief_neutralize"
+  ],
+  "height_blender_units": 1.902,
+  "foot_z": -0.952,
+  "actions": [
+    {
+      "name": "idle",
+      "frames": [
+        1,
+        91
+      ]
+    },
+    {
+      "name": "walk",
+      "frames": [
+        1,
+        61
+      ]
+    },
+    {
+      "name": "walk_original",
+      "frames": [
+        1,
+        61
+      ]
+    },
+    {
+      "name": "walk_root",
+      "frames": [
+        1,
+        61
+      ]
+    },
+    {
+      "name": "wave",
+      "frames": [
+        1,
+        91
+      ]
+    }
+  ],
+  "fps": 15,
+  "images": {
+    "body_basecolor_v06.png": [
+      4096,
+      4096
+    ],
+    "head_e0_m0": [
+      4096,
+      4096
+    ],
+    "head_e0_m1": [
+      4096,
+      4096
+    ],
+    "head_e0_m2": [
+      4096,
+      4096
+    ],
+    "head_e1_m0": [
+      4096,
+      4096
+    ],
+    "head_e1_m1": [
+      4096,
+      4096
+    ],
+    "head_e1_m2": [
+      4096,
+      4096
+    ],
+    "head_e2_m0": [
+      4096,
+      4096
+    ],
+    "head_e2_m1": [
+      4096,
+      4096
+    ],
+    "head_e2_m2": [
+      4096,
+      4096
+    ],
+    "mouth_small_mask": [
+      2048,
+      2048
+    ],
+    "mouth_large_mask": [
+      2048,
+      2048
+    ]
+  }
+}

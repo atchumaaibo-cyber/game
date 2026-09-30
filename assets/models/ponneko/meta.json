@@ -1,0 +1,134 @@
+{
+  "source": "Y:\\90_3d\\3Dモデル制作\\ぽんねこ二足制作\\07_G5\\pon_g5_v03_actions_猫背20_アイウエオ.blend",
+  "glb": "ponneko.glb",
+  "glb_mb": 13.17,
+  "armature": "Pon_rig",
+  "bones": 23,
+  "extra_bones": [
+    "ear.L",
+    "ear.R",
+    "tail.1",
+    "tail.2",
+    "tail.3",
+    "tail.4"
+  ],
+  "rest_pose": "T",
+  "arm_max_deg": null,
+  "meshes": [
+    "Pon_body",
+    "Pon_head"
+  ],
+  "triangles": 94796,
+  "shape_keys": [],
+  "height_blender_units": 1.899,
+  "foot_z": -0.948,
+  "actions": [
+    {
+      "name": "idle",
+      "frames": [
+        1,
+        48
+      ]
+    },
+    {
+      "name": "walk",
+      "frames": [
+        1,
+        31
+      ]
+    },
+    {
+      "name": "walk_root",
+      "frames": [
+        1,
+        91
+      ]
+    },
+    {
+      "name": "wave",
+      "frames": [
+        1,
+        48
+      ]
+    }
+  ],
+  "fps": 24,
+  "images": {
+    "pon_body_base": [
+      4096,
+      4096
+    ],
+    "pon_head_eyeOpen_mouthClosed": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeOpen_mouthA": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeOpen_mouthI": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeOpen_mouthU": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeOpen_mouthE": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeOpen_mouthO": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeClosed_mouthClosed": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeClosed_mouthA": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeClosed_mouthI": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeClosed_mouthU": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeClosed_mouthE": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeClosed_mouthO": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeHalf_mouthClosed": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeHalf_mouthA": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeHalf_mouthI": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeHalf_mouthU": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeHalf_mouthE": [
+      2048,
+      2048
+    ],
+    "pon_head_eyeHalf_mouthO": [
+      2048,
+      2048
+    ]
+  }
+}
