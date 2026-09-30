@@ -1,0 +1,53 @@
+{
+  "source": "Y:\\90_3d\\3Dモデル制作\\ポメラニアン\\G5_動き\\ポメ_g5_v02_丸マズル.blend",
+  "glb": "pome.glb",
+  "glb_mb": 5.9,
+  "armature": "Pome_rig",
+  "bones": 20,
+  "extra_bones": [
+    "ear.L",
+    "ear.R",
+    "tail"
+  ],
+  "rest_pose": "T",
+  "arm_max_deg": null,
+  "meshes": [
+    "ポメ"
+  ],
+  "triangles": 146468,
+  "shape_keys": [],
+  "height_blender_units": 1.883,
+  "foot_z": -0.937,
+  "actions": [
+    {
+      "name": "idle",
+      "frames": [
+        1,
+        48
+      ]
+    },
+    {
+      "name": "walk",
+      "frames": [
+        1,
+        31
+      ]
+    },
+    {
+      "name": "walk_root",
+      "frames": [
+        1,
+        91
+      ]
+    },
+    {
+      "name": "wave",
+      "frames": [
+        1,
+        48
+      ]
+    }
+  ],
+  "fps": 24,
+  "images": {}
+}

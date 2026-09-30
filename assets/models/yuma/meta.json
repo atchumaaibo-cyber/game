@@ -1,0 +1,89 @@
+{
+  "source": "Y:\\90_3d\\3Dモデル制作\\ユウマ二足制作\\完成版\\Blender\\ユウマ_編集用_v09.blend",
+  "glb": "yuma.glb",
+  "glb_mb": 7.86,
+  "armature": "Yuma_rig",
+  "bones": 23,
+  "extra_bones": [
+    "ear.R",
+    "ear.L",
+    "tail.1",
+    "tail.2",
+    "tail.3",
+    "tail.4"
+  ],
+  "rest_pose": "T",
+  "arm_max_deg": null,
+  "meshes": [
+    "BODY_LOCKED",
+    "EAR_SCREEN_LEFT",
+    "EAR_SCREEN_RIGHT",
+    "Tongue_reference_outline"
+  ],
+  "triangles": 104228,
+  "shape_keys": [
+    "Blink_eye_shell_retract",
+    "Blink_surface_restore",
+    "ClosedOnly_ChinVolume",
+    "MouthClose_G2_TEST",
+    "TongueRetract_G2_TEST"
+  ],
+  "height_blender_units": 1.011,
+  "foot_z": -0.512,
+  "actions": [
+    {
+      "name": "hiphop",
+      "frames": [
+        1,
+        191
+      ]
+    },
+    {
+      "name": "idle",
+      "frames": [
+        1,
+        49
+      ]
+    },
+    {
+      "name": "walk",
+      "frames": [
+        1,
+        48
+      ]
+    },
+    {
+      "name": "walk_root",
+      "frames": [
+        1,
+        48
+      ]
+    },
+    {
+      "name": "wave",
+      "frames": [
+        1,
+        48
+      ]
+    }
+  ],
+  "fps": 30,
+  "images": {
+    "BODY_LOCKED_BaseColor_v42": [
+      2048,
+      2048
+    ],
+    "EAR_SCREEN_LEFT_BaseColor_v42": [
+      1024,
+      1024
+    ],
+    "EAR_SCREEN_RIGHT_BaseColor_v42": [
+      1024,
+      1024
+    ],
+    "2026-09-24_二足ユウマ_G0_胸逆V境界_正面側面_v04.png": [
+      1536,
+      1024
+    ]
+  }
+}
