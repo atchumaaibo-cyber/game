@@ -15,3 +15,4 @@
 ## ゲーム
 
 - [犬FPS](games/dog-fps/README.md) … `games/dog-fps/`（遊び方はそこの README）
+- [犬FPS](games/dog-fps/README.md)（`games/dog-fps/index.html`）

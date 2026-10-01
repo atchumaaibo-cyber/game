@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ユウマクエスト</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  :root { --ui: 'DotGothic16', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: var(--ui); color: #fff; user-select: none; touch-action: none; }
+  canvas { display: block; width: 100%; height: 100%; }
+  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  #loading { background: #000; z-index: 30; }
+  #loading .bar { width: min(70vw, 420px); height: 14px; border: 3px solid #fff; margin-top: 18px; }
+  #loading .bar i { display: block; height: 100%; width: 0; background: #fff; }
+  #title { z-index: 20; background: radial-gradient(ellipse at center, rgba(0,0,40,.35), rgba(0,0,20,.8)); cursor: pointer; display: none; }
+  #title h1 { font-size: clamp(40px, 10vw, 96px); margin: 0 0 6px; letter-spacing: .08em; text-shadow: 0 4px 0 #1b2a8a, 0 0 24px #7aa2ff; }
+  #title .sub { font-size: clamp(14px, 2.4vw, 22px); opacity: .9; margin-bottom: 36px; }
+  #title .start { font-size: clamp(18px, 3vw, 28px); animation: blink 1.1s steps(2) infinite; }
+  #title .how { margin-top: 28px; font-size: clamp(12px, 1.8vw, 16px); line-height: 1.8; opacity: .85; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .win { background: rgba(0, 0, 60, .88); border: 4px solid #fff; border-radius: 10px; box-shadow: 0 0 0 3px #000, 0 6px 20px rgba(0,0,0,.5); }
+  #dialog { position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%); width: min(92vw, 820px); min-height: 150px; padding: 18px 24px 22px; z-index: 10; display: none; font-size: clamp(16px, 2.6vw, 24px); line-height: 1.7; cursor: pointer; }
+  #dialog .who { position: absolute; top: -18px; left: 20px; padding: 2px 14px; font-size: .75em; background: rgba(0,0,60,.95); border: 3px solid #fff; border-radius: 6px; }
+  #dialog .next { position: absolute; right: 18px; bottom: 8px; font-size: .8em; animation: blink .8s steps(2) infinite; visibility: hidden; }
+  #hud { position: fixed; top: 12px; left: 12px; padding: 8px 14px; z-index: 5; font-size: clamp(12px, 2vw, 17px); display: none; }
+  #sub { position: fixed; top: 22%; left: 50%; transform: translateX(-50%); z-index: 6; padding: 8px 18px; font-size: clamp(14px, 2.4vw, 22px); display: none; white-space: nowrap; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 15; transition: opacity 1.4s; }
+  #end { z-index: 25; display: none; background: rgba(0,0,30,.0); transition: background 2s; pointer-events: none; }
+  #end.show { background: rgba(0,0,30,.45); pointer-events: auto; }
+  #end .line { font-size: clamp(16px, 3vw, 28px); line-height: 2; opacity: 0; transition: opacity 1.2s; text-shadow: 0 2px 6px #000; }
+  #end .line.on { opacity: 1; }
+  #end .fin { font-size: clamp(44px, 12vw, 110px); letter-spacing: .15em; margin: 14px 0 4px; text-shadow: 0 4px 0 #8a3a1b, 0 0 30px #ffd37a; opacity: 0; transition: opacity 1.5s; }
+  #end .fin.on { opacity: 1; }
+  #end button { margin-top: 18px; font-family: var(--ui); font-size: clamp(16px, 2.6vw, 22px); color: #fff; padding: 10px 28px; cursor: pointer; opacity: 0; transition: opacity 1s; }
+  #end button.on { opacity: 1; }
+  #stick { position: fixed; left: 24px; bottom: 28px; width: 130px; height: 130px; border-radius: 50%; border: 3px solid rgba(255,255,255,.55); background: rgba(255,255,255,.12); z-index: 8; display: none; }
+  #stick i { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(255,255,255,.55); }
+  body.touch.playing #stick { display: block; }
+</style>
+</head>
+<body>
+<div id="loading" class="overlay">
+  <div style="font-size:22px">ユウマクエスト　よみこみちゅう…</div>
+  <div class="bar"><i id="bar"></i></div>
+  <div id="loadmsg" style="margin-top:14px;font-size:13px;opacity:.7"></div>
+</div>
+<div id="title" class="overlay">
+  <h1>ユウマクエスト</h1>
+  <div class="sub">― 犬の勇者と、わすれもの ―</div>
+  <div class="start">▶ クリック / タップ で はじめる</div>
+  <div class="how">うごかす：WASD / ↑↓←→ ・ カメラ：Q E / ドラッグ<br>はなす・つぎへ：スペース / クリック<br>♪ おとが でます（約2ふん）</div>
+</div>
+<div id="hud" class="win"></div>
+<div id="sub" class="win"></div>
+<div id="dialog" class="win"><div class="who"></div><div class="text"></div><div class="next">▼</div></div>
+<div id="fade"></div>
+<div id="end" class="overlay">
+  <div class="line" id="e1">ユウマは 王様の たのみを すっかり わすれて、</div>
+  <div class="line" id="e2">オヤツを おなかいっぱい たべましたとさ。</div>
+  <div class="fin" id="efin">おしまい</div>
+  <div class="line" id="e3" style="font-size:clamp(12px,2vw,18px)"></div>
+  <button id="again" class="win">もういちど あそぶ</button>
+</div>
+<div id="stick"><i></i></div>
+<canvas id="c"></canvas>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.min.js", "three/addons/": "./lib/addons/" } }
+</script>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
