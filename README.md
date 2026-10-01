@@ -15,3 +15,4 @@
 ## ゲーム
 
 - [ユウマクエスト](games/yuma-quest/README.md)（`games/yuma-quest/index.html`）
+- [犬FPS](games/dog-fps/README.md)（`games/dog-fps/index.html`）
