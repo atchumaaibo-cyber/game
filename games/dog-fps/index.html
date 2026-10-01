@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>犬FPS オヤツでとめろ！</title>
+<style>
+  :root { --ink: #3a2a1a; --paper: #fff8ec; --accent: #ff7a3d; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #a9d6f5; font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", "Meiryo", sans-serif; color: var(--ink); }
+  canvas { display: block; }
+  .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; }
+  .hidden { display: none !important; }
+  h1 { margin: 0; font-size: clamp(28px, 6vw, 56px); color: #fff; text-shadow: 0 3px 0 var(--ink), 0 0 12px rgba(0,0,0,.3); }
+  .panel { background: var(--paper); border: 3px solid var(--ink); border-radius: 16px; padding: 14px 20px; box-shadow: 0 6px 0 rgba(0,0,0,.25); max-width: 560px; }
+  button { font: inherit; font-size: 20px; padding: 10px 24px; border-radius: 12px; border: 3px solid var(--ink); background: var(--accent); color: #fff; cursor: pointer; box-shadow: 0 4px 0 var(--ink); }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  #loading .bar { width: min(420px, 80vw); height: 18px; border: 3px solid var(--ink); border-radius: 10px; background: #fff; overflow: hidden; }
+  #loading .bar div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  #select { justify-content: flex-end; padding-bottom: 28px; pointer-events: none; }
+  #select > * { pointer-events: auto; }
+  #cards { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; padding: 0 16px; }
+  .card { background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; padding: 10px 16px; min-width: 110px; cursor: pointer; box-shadow: 0 4px 0 var(--ink); }
+  .card:hover, .card.on { background: #ffe07a; transform: translateY(-4px); }
+  .card b { display: block; font-size: 22px; }
+  .card small { font-size: 13px; }
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #cross { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; }
+  #cross::before, #cross::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 2px #000; }
+  #cross::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #cross::after { top: 10px; left: 0; height: 2px; width: 22px; }
+  #top { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; font-size: 20px; }
+  #top > div { background: rgba(255,248,236,.9); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 12px; }
+  #hearts { color: #e8375a; letter-spacing: 2px; }
+  #treats { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+  .treat { white-space: nowrap; background: rgba(255,248,236,.9); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 10px; font-size: 15px; opacity: .6; }
+  .treat.on { opacity: 1; background: #ffe07a; transform: translateY(-4px); }
+  .treat i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; border: 1px solid var(--ink); }
+  #toast { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 30px; color: #fff; text-shadow: 0 3px 0 var(--ink); white-space: nowrap; transition: opacity .4s; opacity: 0; }
+  #flash { position: absolute; inset: 0; background: #ff2d4a; opacity: 0; transition: opacity .3s; }
+  #pause { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.35); }
+  kbd { background: #fff; border: 2px solid var(--ink); border-radius: 6px; padding: 0 6px; font-family: inherit; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body>
+<div id="loading" class="screen">
+  <h1>犬FPS オヤツでとめろ！</h1>
+  <div class="bar"><div></div></div>
+  <div id="loadmsg">箱庭と犬たちを読み込み中…</div>
+</div>
+
+<div id="select" class="screen hidden">
+  <div class="panel">
+    <b>だれで遊ぶ？</b> 選ばれなかった子とあっちが、ゾンビみたいに迫ってくるよ。<br>
+    好物のオヤツを投げてあげると、夢中になって動かなくなる。全員とめたらクリア！
+  </div>
+  <div id="cards"></div>
+</div>
+
+<div id="hud" class="hidden">
+  <div id="cross"></div>
+  <div id="top">
+    <div id="hearts"></div>
+    <div id="fed"></div>
+    <div id="time"></div>
+  </div>
+  <div id="treats"></div>
+  <div id="toast"></div>
+  <div id="flash"></div>
+</div>
+
+<div id="pause" class="hidden">
+  <div class="panel">
+    <p style="font-size:22px;margin:4px 0 10px"><b>クリックでスタート</b></p>
+    <p style="margin:4px 0"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 歩く　<kbd>Shift</kbd> 走る　<kbd>Space</kbd> ジャンプ</p>
+    <p style="margin:4px 0">マウスで見回す　<b>クリック</b>でオヤツを投げる</p>
+    <p style="margin:4px 0"><kbd>1</kbd>〜<kbd>5</kbd> かホイールでオヤツを変える　<kbd>Esc</kbd> 一時停止</p>
+  </div>
+</div>
+
+<div id="result" class="screen hidden">
+  <h1 id="resultTitle"></h1>
+  <div class="panel" id="resultText"></div>
+  <button id="again">もう一回</button>
+</div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
