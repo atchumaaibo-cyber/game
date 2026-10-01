@@ -15,17 +15,26 @@
   #loading { background: #000; z-index: 30; }
   #loading .bar { width: min(70vw, 420px); height: 14px; border: 3px solid #fff; margin-top: 18px; }
   #loading .bar i { display: block; height: 100%; width: 0; background: #fff; }
-  #title { z-index: 20; background: radial-gradient(ellipse at center, rgba(0,0,40,.35), rgba(0,0,20,.8)); cursor: pointer; display: none; }
-  #title h1 { font-size: clamp(40px, 10vw, 96px); margin: 0 0 6px; letter-spacing: .08em; text-shadow: 0 4px 0 #1b2a8a, 0 0 24px #7aa2ff; }
-  #title .sub { font-size: clamp(14px, 2.4vw, 22px); opacity: .9; margin-bottom: 36px; }
-  #title .start { font-size: clamp(18px, 3vw, 28px); animation: blink 1.1s steps(2) infinite; }
-  #title .how { margin-top: 28px; font-size: clamp(12px, 1.8vw, 16px); line-height: 1.8; opacity: .85; }
+  #title { z-index: 20; background: linear-gradient(#000 0%, #020418 55%, #0a1240 100%); cursor: pointer; display: none; overflow: hidden; }
+  #stars { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #title .logo { position: relative; font-family: 'Hiragino Mincho ProN', 'Noto Serif JP', 'Yu Mincho', serif; font-weight: 900; font-size: clamp(46px, 12.5vw, 150px); line-height: 1.05; letter-spacing: .04em; margin: 0; white-space: nowrap;
+    background: linear-gradient(#e8f4ff 0%, #8fc0ff 38%, #2a5cd8 52%, #1b2f9a 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: clamp(3px, .7vw, 9px) #f2c640; paint-order: stroke fill; filter: drop-shadow(0 6px 0 #5a3a00) drop-shadow(0 0 18px rgba(120,160,255,.6)); }
+  #title .num { position: relative; font-family: 'Hiragino Mincho ProN', 'Noto Serif JP', serif; font-weight: 900; font-size: clamp(24px, 5.5vw, 60px); color: #f2c640; letter-spacing: .3em; text-shadow: 0 3px 0 #5a3a00; margin-top: 4px; }
+  #title .sub { position: relative; font-size: clamp(13px, 2.2vw, 20px); color: #cfe0ff; margin: 6px 0 clamp(22px, 5vh, 46px); letter-spacing: .2em; }
+  #title .menu { position: relative; padding: 14px 40px 14px 24px; font-size: clamp(16px, 2.8vw, 26px); line-height: 2; text-align: left; }
+  #title .menu .cur { display: inline-block; width: 1.2em; animation: blink 1s steps(2) infinite; }
+  #title .menu .dim { opacity: .45; }
+  #title .copy { position: absolute; bottom: 10px; left: 0; right: 0; font-size: clamp(10px, 1.6vw, 14px); opacity: .8; letter-spacing: .1em; }
+  #title .how { position: absolute; bottom: 30px; left: 0; right: 0; font-size: clamp(10px, 1.6vw, 14px); opacity: .7; }
+  #title .castle { position: absolute; left: 0; right: 0; bottom: 0; height: 26%; width: 100%; }
   @keyframes blink { 50% { opacity: 0; } }
   .win { background: rgba(0, 0, 60, .88); border: 4px solid #fff; border-radius: 10px; box-shadow: 0 0 0 3px #000, 0 6px 20px rgba(0,0,0,.5); }
   #dialog { position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%); width: min(92vw, 820px); min-height: 150px; padding: 18px 24px 22px; z-index: 10; display: none; font-size: clamp(16px, 2.6vw, 24px); line-height: 1.7; cursor: pointer; }
   #dialog .who { position: absolute; top: -18px; left: 20px; padding: 2px 14px; font-size: .75em; background: rgba(0,0,60,.95); border: 3px solid #fff; border-radius: 6px; }
   #dialog .next { position: absolute; right: 18px; bottom: 8px; font-size: .8em; animation: blink .8s steps(2) infinite; visibility: hidden; }
   #hud { position: fixed; top: 12px; left: 12px; padding: 8px 14px; z-index: 5; font-size: clamp(12px, 2vw, 17px); display: none; }
+  #lv { position: fixed; top: 12px; right: 12px; padding: 8px 14px; z-index: 5; font-size: clamp(12px, 2vw, 18px); display: none; color: #ffe27a; }
   #sub { position: fixed; top: 22%; left: 50%; transform: translateX(-50%); z-index: 6; padding: 8px 18px; font-size: clamp(14px, 2.4vw, 22px); display: none; white-space: nowrap; }
   #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 15; transition: opacity 1.4s; }
   #end { z-index: 25; display: none; background: rgba(0,0,30,.0); transition: background 2s; pointer-events: none; }
@@ -48,12 +57,26 @@
   <div id="loadmsg" style="margin-top:14px;font-size:13px;opacity:.7"></div>
 </div>
 <div id="title" class="overlay">
-  <h1>ユウマクエスト</h1>
-  <div class="sub">― 犬の勇者と、わすれもの ―</div>
-  <div class="start">▶ クリック / タップ で はじめる</div>
-  <div class="how">うごかす：WASD / ↑↓←→ ・ カメラ：Q E / ドラッグ<br>はなす・つぎへ：スペース / クリック<br>♪ おとが でます（約2ふん）</div>
+  <canvas id="stars"></canvas>
+  <svg class="castle" viewBox="0 0 1200 220" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <path d="M0 220 V150 Q150 110 300 150 T600 140 T900 150 T1200 130 V220Z" fill="#050a22"/>
+    <g fill="#02040f">
+      <path d="M0 220 V175 Q200 140 380 178 T760 170 T1200 160 V220Z"/>
+      <rect x="520" y="120" width="160" height="60"/><rect x="545" y="92" width="110" height="30"/><rect x="565" y="68" width="70" height="26"/>
+      <path d="M505 120 L600 100 L695 120Z"/><path d="M535 92 L600 74 L665 92Z"/><path d="M555 68 L600 48 L645 68Z"/>
+      <rect x="470" y="130" width="40" height="55"/><path d="M462 130 L490 112 L518 130Z"/>
+      <rect x="690" y="130" width="40" height="55"/><path d="M682 130 L710 112 L738 130Z"/>
+    </g>
+  </svg>
+  <div class="logo">ユウマクエスト</div>
+  <div class="num">― I ―</div>
+  <div class="sub">いぬの ゆうしゃと わすれもの</div>
+  <div class="menu win"><span class="cur">▶</span>ぼうけんを はじめる<br><span class="cur"></span><span class="dim">つづきから（じゅんびちゅう）</span></div>
+  <div class="how">うごかす：WASD / ↑↓←→　カメラ：Q E / ドラッグ　はなす・つぎへ：スペース / クリック　♪ おとが でます</div>
+  <div class="copy">© 2026 ATCHI-YUMA PROJECT　― PUSH SPACE / TAP ―</div>
 </div>
 <div id="hud" class="win"></div>
+<div id="lv" class="win"></div>
 <div id="sub" class="win"></div>
 <div id="dialog" class="win"><div class="who"></div><div class="text"></div><div class="next">▼</div></div>
 <div id="fade"></div>

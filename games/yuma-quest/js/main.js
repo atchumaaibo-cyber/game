@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Music } from './music.js';
+import { buildCastle } from './castle.js';
+import { dressHero, dressButler, dressFriend } from './dress.js';
 
 const $ = (id) => document.getElementById(id);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -52,8 +54,8 @@ const music = new Music();
 
 // ---------------------------------------------------------------- 読み込み
 const loader = new GLTFLoader();
-const sizes = { yuma: 7.9, atchi: 7.4, stage: 16.1 };
-const loaded = { yuma: 0, atchi: 0, stage: 0 };
+const sizes = { yuma: 7.9, atchi: 7.4, stage: 16.1, poodle: 12.5, pome: 5.9, ponneko: 13.2 };
+const loaded = { yuma: 0, atchi: 0, stage: 0, poodle: 0, pome: 0, ponneko: 0 };
 function load(key, url) {
   return new Promise((res, rej) => loader.load(url, res, (e) => {
     loaded[key] = e.loaded / 1048576;
@@ -89,6 +91,7 @@ function makeChar(gltf, height) {
   model.position.y = -box.min.y * s;
   const group = new THREE.Group();
   group.add(model);
+  const dims = { top: (box.max.y - box.min.y) * s, cx: (box.min.x + box.max.x) / 2 * s, cz: (box.min.z + box.max.z) / 2 * s };
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = 0.04;
@@ -98,7 +101,7 @@ function makeChar(gltf, height) {
   const actions = {};
   gltf.animations.forEach((c) => { actions[c.name] = mixer.clipAction(c); });
   const ch = {
-    group, model, mixer, actions, current: null, scale: s,
+    group, model, mixer, actions, current: null, scale: s, height, dims,
     play(name, fade = 0.25, speed = 1) {
       const a = actions[name];
       if (!a || this.current === a) { if (a) a.timeScale = speed; return; }
@@ -112,7 +115,9 @@ function makeChar(gltf, height) {
 }
 
 // ---------------------------------------------------------------- 状態
-let yuma, king, stage, snack, crumbs, confetti;
+let yuma, king, stage, snack, crumbs, confetti, poodle, pome, butler, castle;
+const trail = [];
+let following = false;
 let state = 'loading';
 let started = 0;
 const keys = {};
@@ -518,15 +523,59 @@ async function intro() {
   });
   yuma.play('idle');
   await wait(300);
-  setCam(new THREE.Vector3(4.2, 5.4, -10), new THREE.Vector3(-0.2, 4.9, -21));
+  const meetCam = () => setCam(new THREE.Vector3(4.4, 5.5, -10), new THREE.Vector3(0.2, 4.9, -21));
+  meetCam();
   king.play('wave', 0.2);
   await talk([
     ['王様', 'おお ゆうしゃ ユウマよ！ よくぞ きてくれた！'],
+    ['王様', 'となりに おるのは しつじの ぽんねこじゃ。 なんでも めいれい するが よい。'],
+    ['ぽんねこ', 'ぽんねこで ございます にゃ。 どうぞ おみしりおきを。'],
     ['王様', 'いま この くにに 魔王が ふたたび めざめ、 そらは くもり ひとびとは ふるえて おる。'],
     ['王様', 'そなたの ちからが ひつようなのじゃ。 どうか 魔王を うちたおして おくれ！'],
     ['王様', 'これは ささやかな ほうしゅうじゃ。 ひのきの ぼうと 5ゴールド！'],
     ['', 'ユウマは ひのきの ぼうを てにいれた！ …ちょっと かじってみた。'],
-    ['王様', 'では ゆくのじゃ ユウマよ！ しろを でて 魔王の しろを めざせ！ たのんだぞ！'],
+    ['王様', 'ひとりでは しんぱいじゃ。 なかまを しょうかいしよう！ …これ、 はいりなさい！'],
+  ]);
+  king.play('idle', 0.4);
+  // 仲間のかけつけ
+  poodle.group.visible = pome.group.visible = true;
+  poodle.group.position.set(-2.1, 3.7, 14);
+  pome.group.position.set(2.1, 3.7, 14);
+  poodle.group.rotation.y = pome.group.rotation.y = Math.PI;
+  const camFollow = () => setCam(new THREE.Vector3(5.5, 5.2, poodle.group.position.z + 8), new THREE.Vector3(0, 4.9, poodle.group.position.z - 5));
+  await Promise.all([
+    moveChar(poodle, new THREE.Vector3(-2.1, 3.7, -17.5), 7, camFollow),
+    moveChar(pome, new THREE.Vector3(2.1, 3.7, -17.5), 7),
+  ]);
+  for (const c of [poodle, pome]) c.group.rotation.y = Math.PI;
+  meetCam();
+  poodle.play('wave', 0.2);
+  await talk([
+    ['プードル', 'はじめまして ゆうしゃさま。 プードルですわ。 おそばで おつかえ しますの。'],
+  ]);
+  poodle.play('idle', 0.3); pome.play('wave', 0.2);
+  await talk([
+    ['ポメ', 'ポメです！ ふわふわで ゆうしゃさまを まもるよ！'],
+  ]);
+  pome.play('idle', 0.3);
+  music.found();
+  await talk([['', 'プードルと ポメが なかまに くわわった！']]);
+  // 縦ならび（ドラクエ2）で ついてくる準備
+  trail.length = 0;
+  for (let i = 0; i < 40; i++) trail.push(new THREE.Vector3(YUMA_MEET.x, 3.7, YUMA_MEET.z - 0.3 * (i + 1)));
+  following = true;
+
+  // 城をレベルアップ
+  await talk([
+    ['王様', 'ところで ここは すんぷじょうの あと。 いまは てんしゅが ないのが なやみ なのじゃ…。'],
+    ['王様', 'そこで！ ゆうしゃの たびだちを いわって、 この しろを レベルアップ させるぞ！！'],
+  ]);
+  await castleShow();
+
+  setCam(new THREE.Vector3(4.4, 5.5, -10), new THREE.Vector3(0.2, 4.9, -21), true);
+  king.play('wave', 0.2);
+  await talk([
+    ['王様', 'うむ！ これで あんしんじゃ！ ゆうしゃ ユウマと なかまたちよ、 しろを でて 魔王の しろを めざせ！ たのんだぞ！'],
   ]);
   music.bark();
   await talk([['ユウマ', 'ワンッ！ まかせて！']]);
@@ -535,6 +584,72 @@ async function intro() {
   yuma.group.rotation.y = Math.PI;
   state = 'play';
   document.body.classList.add('playing');
+}
+
+function moveChar(ch, target, speed = 6.5, camFn) {
+  return new Promise((res) => {
+    let last = performance.now();
+    const tick = () => {
+      const now = performance.now(), dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      const done = walkTo(ch, target, speed, dt, 0.05);
+      ch.play(done ? 'idle' : 'walk', 0.15, 1.3);
+      if (camFn) camFn();
+      if (done) return res();
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+}
+
+const lvEl = $('lv');
+function showLv(text) { lvEl.textContent = text; lvEl.style.display = 'block'; }
+async function castleShow() {
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  setCam(V(-26, 13, -56), V(-26, 14, -80), true);
+  showLv('しろレベル　Lv.1　〜 かんばん だけ 〜');
+  await wait(3200);
+  music.found();
+  showLv('しろレベル　Lv.2　〜 てんしゅ かんせい！ 〜');
+  setCam(V(-4, 20, -44), V(-26, 22, -88));
+  await castle.setLevel(2);
+  await wait(2400);
+  music.found();
+  showLv('しろレベル　Lv.3　〜 きんぴか！！ 〜');
+  setCam(V(10, 24, -34), V(-26, 26, -88));
+  await castle.setLevel(3);
+  await wait(2400);
+  music.found();
+  showLv('しろレベル　Lv.99　〜 ぜんぶ のせ！！！ 〜');
+  setCam(V(26, 30, -24), V(-26, 32, -88));
+  await castle.setLevel(4);
+  await wait(4200);
+  showLv('しろレベル　Lv.99');
+}
+
+// ---- なかま（縦ならびで ついてくる）
+const FOLLOW_GAP = [2.0, 4.0];
+function updateTrail() {
+  const p = yuma.group.position, l = trail[0];
+  if (!l || Math.hypot(p.x - l.x, p.z - l.z) > 0.25) { trail.unshift(p.clone()); if (trail.length > 80) trail.pop(); }
+}
+function followerUpdate(ch, gap, dt) {
+  let acc = 0, prev = yuma.group.position, target = prev;
+  for (const t of trail) {
+    acc += Math.hypot(t.x - prev.x, t.z - prev.z); prev = t; target = t;
+    if (acc >= gap) break;
+  }
+  const p = ch.group.position;
+  const dx = target.x - p.x, dz = target.z - p.z, d = Math.hypot(dx, dz);
+  if (d > 0.12) {
+    const sp = clamp(d * 4.5, 0, 8);
+    const step = Math.min(d, sp * dt);
+    p.x += dx / d * step; p.z += dz / d * step;
+    faceTo(ch, dx, dz, dt, 12);
+    ch.play('walk', 0.15, clamp(sp / 4.5, 0.6, 1.8));
+  } else ch.play('idle', 0.2);
+  const g = groundAt(p.x, p.z);
+  if (g != null) p.y += (g - p.y) * (1 - Math.exp(-dt * 15));
 }
 
 let kingCheered = false, hintShown = false;
@@ -607,7 +722,11 @@ async function ending() {
   state = 'ending';
   music.play('ending');
   yuma.play('hiphop', 0.3);
+  following = false;
   const c = yuma.group.position.clone();
+  poodle.group.position.set(c.x - 1.9, c.y, c.z + 0.4); pome.group.position.set(c.x + 1.9, c.y, c.z + 0.4);
+  poodle.group.rotation.y = pome.group.rotation.y = 0;
+  poodle.play('wave', 0.3); pome.play('wave', 0.3);
   orbit = { center: c, a: Math.PI * 0.15, r: 5.2, h: 1.9 };
   confetti.visible = true; confetti.userData.active = true;
   $('end').style.display = 'flex';
@@ -640,8 +759,13 @@ function frame() {
       if (!hintShown && p.z > RAMP_Z0 + 4) { hintShown = true; subtitle('…… なんだか いい においが する！？', 3500); }
       if (p.z >= SNACK_POS.z - 8 && groundAt(p.x, p.z) != null && p.z > BRIDGE_END + 1.5) snackScene();
     }
-    yuma.mixer.update(dt);
-    king.mixer.update(dt);
+    if (following) {
+      updateTrail();
+      followerUpdate(poodle, FOLLOW_GAP[0], dt);
+      followerUpdate(pome, FOLLOW_GAP[1], dt);
+    }
+    for (const c of [yuma, king, poodle, pome, butler]) c.mixer.update(dt);
+    castle.update(dt, time);
     if (eating) {
       eatBob += dt * 16;
       const head = yuma.bone('neck') || yuma.bone('head');
@@ -661,12 +785,34 @@ function frame() {
   renderer.render(scene, camera);
 }
 
+// ---------------------------------------------------------------- タイトルの星空
+function twinkle() {
+  const c = $('stars'), g = c.getContext('2d');
+  const fit = () => { c.width = c.clientWidth; c.height = c.clientHeight; };
+  fit(); addEventListener('resize', fit);
+  const st = Array.from({ length: 140 }, () => ({ x: Math.random(), y: Math.random() * 0.8, r: Math.random() * 1.6 + 0.4, p: Math.random() * 6 }));
+  const draw = (t) => {
+    if (state !== 'title') return;
+    g.clearRect(0, 0, c.width, c.height);
+    for (const s of st) {
+      g.globalAlpha = 0.35 + 0.65 * Math.abs(Math.sin(t / 900 + s.p));
+      g.fillStyle = '#fff';
+      g.fillRect(s.x * c.width, s.y * c.height, s.r, s.r);
+    }
+    requestAnimationFrame(draw);
+  };
+  requestAnimationFrame(draw);
+}
+
 // ---------------------------------------------------------------- 起動
 async function boot() {
-  const [gy, ga, gs] = await Promise.all([
+  const [gy, ga, gs, gp, gm, gb] = await Promise.all([
     load('yuma', '../../assets/models/yuma/yuma.glb'),
     load('atchi', '../../assets/models/atchi/atchi.glb'),
     load('stage', '../../assets/stage/shizuoka_hakoniwa.glb'),
+    load('poodle', '../../assets/models/poodle/poodle.glb'),
+    load('pome', '../../assets/models/pome/pome.glb'),
+    load('ponneko', '../../assets/models/ponneko/ponneko.glb'),
   ]);
   stage = gs.scene;
   scene.add(stage);
@@ -677,18 +823,31 @@ async function boot() {
   yuma.group.position.copy(YUMA_START);
   king.group.position.copy(KING_POS);
   king.group.rotation.y = 0;
-  scene.add(yuma.group, king.group);
-  yuma.play('idle', 0);
-  king.play('idle', 0);
+  poodle = makeChar(gp, 1.5);
+  pome = makeChar(gm, 1.45);
+  butler = makeChar(gb, 1.6);
+  king.group.position.copy(KING_POS).add(new THREE.Vector3(-0.8, 0, 0));
+  butler.group.position.set(2.0, 3.7, -24);
+  butler.group.rotation.y = -0.25;
+  poodle.group.position.set(-1.8, 3.7, 14);
+  pome.group.position.set(1.8, 3.7, 14);
+  poodle.group.visible = pome.group.visible = false;
+  scene.add(yuma.group, king.group, poodle.group, pome.group, butler.group);
+  for (const c of [yuma, king, poodle, pome, butler]) { c.group.updateMatrixWorld(true); c.play('idle', 0); }
   dressKing(king);
+  dressHero(yuma);
+  dressButler(butler);
+  dressFriend(poodle, 0xe0306a);
+  dressFriend(pome, 0x2a7ae0);
   buildProps();
+  castle = buildCastle(scene);
   camera.position.set(8, 6.5, -4);
   camLook.set(0, 5, -20);
   camTarget.pos.copy(camera.position); camTarget.look.copy(camLook);
   $('loading').style.display = 'none';
   $('title').style.display = 'flex';
   state = 'title';
-  window.__game = { THREE, scene, camera, yuma, king, setCam, snackScene, ending, get state() { return state; }, groundAt, set camYaw(v) { camYaw = v; } };
+  window.__game = { THREE, scene, camera, yuma, king, poodle, pome, butler, castle, castleShow, setCam, snackScene, ending, get state() { return state; }, groundAt, set camYaw(v) { camYaw = v; } };
   // タイトル画面ではお城を見せる
   setCam(new THREE.Vector3(7, 6.2, -9), new THREE.Vector3(0, 4.8, -24), true);
   const startGame = () => {
@@ -699,6 +858,7 @@ async function boot() {
     intro();
   };
   $('title').addEventListener('pointerdown', startGame);
+  twinkle();
   addEventListener('keydown', (e) => { if (state === 'title' && ['Space', 'Enter'].includes(e.code)) startGame(); });
   if (DEBUG.has('autostart')) startGame();
 }
