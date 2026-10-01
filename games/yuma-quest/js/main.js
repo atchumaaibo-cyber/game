@@ -503,11 +503,15 @@ async function intro() {
   king.play('idle');
   // 玉座の前へ歩いていく
   await new Promise((res) => {
+    let last = performance.now();
     const tick = () => {
       if (state !== 'cut1') return res();
+      const now = performance.now(), dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      walkTo(yuma, YUMA_MEET, 6.5, dt, 0.05);
       const p = yuma.group.position;
       setCam(new THREE.Vector3(6, p.y + 2.6, p.z + 6), new THREE.Vector3(0, p.y + 1.2, p.z - 6));
-      if (p.z <= YUMA_MEET.z + 0.05) return res();
+      if (p.z <= YUMA_MEET.z + 0.1) return res();
       requestAnimationFrame(tick);
     };
     tick();
