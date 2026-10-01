@@ -11,3 +11,7 @@
 
 - `assets/models/<キャラ>/` … ユウマ・プードル・ポメ・あっち・ぽんねこの GLB（骨・動き入り）と表情の画像
 - `assets/stage/shizuoka_hakoniwa.glb` … 静岡の箱庭（ゲームの舞台）
+
+## ゲーム
+
+- [ユウマクエスト](games/yuma-quest/README.md)（`games/yuma-quest/index.html`）
