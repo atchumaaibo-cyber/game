@@ -23,6 +23,15 @@
   #title .num { position: relative; font-family: 'Hiragino Mincho ProN', 'Noto Serif JP', serif; font-weight: 900; font-size: clamp(24px, 5.5vw, 60px); color: #f2c640; letter-spacing: .3em; text-shadow: 0 3px 0 #5a3a00; margin-top: 4px; }
   #title .sub { position: relative; font-size: clamp(13px, 2.2vw, 20px); color: #cfe0ff; margin: 6px 0 clamp(22px, 5vh, 46px); letter-spacing: .2em; }
   #title .menu { position: relative; padding: 14px 40px 14px 24px; font-size: clamp(16px, 2.8vw, 26px); line-height: 2; text-align: left; }
+  #title .menu .item { cursor: pointer; }
+  #title .menu .item small { opacity: .6; font-size: .7em; margin-left: .4em; }
+  #timer { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); padding: 8px 18px; z-index: 6; font-size: clamp(14px, 2.4vw, 22px); letter-spacing: .06em; display: none; font-variant-numeric: tabular-nums; }
+  #arrow { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 6; display: none; flex-direction: column; align-items: center; pointer-events: none; text-shadow: 0 2px 4px #000; }
+  #arrow .a { font-size: 54px; line-height: 1; color: #ffe27a; filter: drop-shadow(0 0 6px #000) drop-shadow(0 0 10px rgba(255,220,100,.7)); }
+  #arrow .d { font-size: clamp(12px, 2vw, 16px); margin-top: 2px; background: rgba(0,0,60,.8); padding: 2px 10px; border-radius: 6px; }
+  #talkhint { position: fixed; bottom: 118px; left: 50%; transform: translateX(-50%); z-index: 7; padding: 8px 16px; font-size: clamp(13px, 2.2vw, 18px); display: none; cursor: pointer; white-space: nowrap; }
+  #count { position: fixed; inset: 0; z-index: 12; display: none; text-align: center; padding-top: 18vh; font-size: clamp(60px, 18vw, 180px); color: #ffe27a; text-shadow: 0 6px 0 #5a3a00; pointer-events: none; }
+  #end button { margin: 6px; }
   #title .menu .cur { display: inline-block; width: 1.2em; animation: blink 1s steps(2) infinite; }
   #title .menu .dim { opacity: .45; }
   #title .copy { position: absolute; bottom: 10px; left: 0; right: 0; font-size: clamp(10px, 1.6vw, 14px); opacity: .8; letter-spacing: .1em; }
@@ -33,9 +42,9 @@
   #dialog { position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%); width: min(92vw, 820px); min-height: 150px; padding: 18px 24px 22px; z-index: 10; display: none; font-size: clamp(16px, 2.6vw, 24px); line-height: 1.7; cursor: pointer; }
   #dialog .who { position: absolute; top: -18px; left: 20px; padding: 2px 14px; font-size: .75em; background: rgba(0,0,60,.95); border: 3px solid #fff; border-radius: 6px; }
   #dialog .next { position: absolute; right: 18px; bottom: 8px; font-size: .8em; animation: blink .8s steps(2) infinite; visibility: hidden; }
-  #hud { position: fixed; top: 12px; left: 12px; padding: 8px 14px; z-index: 5; font-size: clamp(12px, 2vw, 17px); display: none; }
-  #lv { position: fixed; top: 12px; right: 12px; padding: 8px 14px; z-index: 5; font-size: clamp(12px, 2vw, 18px); display: none; color: #ffe27a; }
-  #sub { position: fixed; top: 22%; left: 50%; transform: translateX(-50%); z-index: 6; padding: 8px 18px; font-size: clamp(14px, 2.4vw, 22px); display: none; white-space: nowrap; }
+  #hud { position: fixed; top: 62px; left: 50%; transform: translateX(-50%); max-width: 94vw; text-align: center; padding: 6px 14px; z-index: 5; font-size: clamp(11px, 1.8vw, 15px); display: none; }
+  #lv { position: fixed; top: 12px; right: 12px; white-space: nowrap; padding: 8px 14px; z-index: 5; font-size: clamp(12px, 2vw, 18px); display: none; color: #ffe27a; }
+  #sub { position: fixed; top: 22%; left: 50%; transform: translateX(-50%); z-index: 6; padding: 8px 18px; font-size: clamp(14px, 2.4vw, 22px); display: none; max-width: 92vw; text-align: center; }
   #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 15; transition: opacity 1.4s; }
   #end { z-index: 25; display: none; background: rgba(0,0,30,.0); transition: background 2s; pointer-events: none; }
   #end.show { background: rgba(0,0,30,.45); pointer-events: auto; }
@@ -71,12 +80,16 @@
   <div class="logo">ユウマクエスト</div>
   <div class="num">― I ―</div>
   <div class="sub">いぬの ゆうしゃと わすれもの</div>
-  <div class="menu win"><span class="cur">▶</span>ぼうけんを はじめる<br><span class="cur"></span><span class="dim">つづきから（じゅんびちゅう）</span></div>
+  <div class="menu win"><div class="item"><span class="cur">▶</span>ぼうけんを はじめる<small>（ものがたり）</small></div><div class="item"><span class="cur"></span>タイムアタック<small>（すぐ はじまる）</small></div></div>
   <div class="how">うごかす：WASD / ↑↓←→　カメラ：Q E / ドラッグ　はなす・つぎへ：スペース / クリック　♪ おとが でます</div>
   <div class="copy">© 2026 ATCHI-YUMA PROJECT　― PUSH SPACE / TAP ―</div>
 </div>
 <div id="hud" class="win"></div>
 <div id="lv" class="win"></div>
+<div id="timer" class="win"></div>
+<div id="arrow"><div class="a">▲</div><div class="d"></div></div>
+<div id="talkhint" class="win"></div>
+<div id="count"></div>
 <div id="sub" class="win"></div>
 <div id="dialog" class="win"><div class="who"></div><div class="text"></div><div class="next">▼</div></div>
 <div id="fade"></div>
@@ -85,7 +98,8 @@
   <div class="line" id="e2">オヤツを おなかいっぱい たべましたとさ。</div>
   <div class="fin" id="efin">おしまい</div>
   <div class="line" id="e3" style="font-size:clamp(12px,2vw,18px)"></div>
-  <button id="again" class="win">もういちど あそぶ</button>
+  <button id="again" class="win">タイムアタックに ちょうせん</button>
+  <button id="again2" class="win">ものがたりから あそぶ</button>
 </div>
 <div id="stick"><i></i></div>
 <canvas id="c"></canvas>
