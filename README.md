@@ -16,3 +16,7 @@
 
 - [ユウマクエスト](games/yuma-quest/README.md)（`games/yuma-quest/index.html`）
 - [犬FPS](games/dog-fps/README.md)（`games/dog-fps/index.html`）
+
+## ブラウザで遊ぶ（GitHub Pages）
+
+リポジトリの Settings → Pages で `main` ブランチ・`/(root)` を選ぶと、`https://atchumaaibo-cyber.github.io/game/` でトップページが開き、そこから2本のゲームを遊べる。ダウンロード不要。
