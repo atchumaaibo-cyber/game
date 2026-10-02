@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Music } from './music.js';
 import { buildCastle } from './castle.js';
-import { dressHero, dressButler, dressFriend } from './dress.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { dressHero, dressButler, dressJester, dressPriest, dressGuard, dressMerchant, dressOden } from './dress.js';
 
 const $ = (id) => document.getElementById(id);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -118,8 +119,16 @@ function makeChar(gltf, height) {
 let yuma, king, stage, snack, crumbs, confetti, poodle, pome, butler, castle;
 const trail = [];
 let following = false;
+let heroGear = null;                 // ユウマの装備（着替え演出まで非表示）
+const npcs = [];                     // 赤絨毯のわきの村人
+let nearNpc = null;
+let quick = false;                   // タイムアタック（すぐ はじまる）
+let runStart = 0, runEnd = 0, running = false;
+const BEST_KEY = 'yuma-quest-best';
+const GOAL = new THREE.Vector3(0, 0, 63);
 let state = 'loading';
 let started = 0;
+let result = null;
 const keys = {};
 const stick = { x: 0, y: 0 };
 let camYaw = 0;
@@ -184,9 +193,67 @@ function objective(text) {
   h.textContent = text; h.style.display = 'block';
 }
 
+// ---------------------------------------------------------------- タイムアタック
+const fmt = (ms) => { const t = Math.max(0, ms) / 1000; const m = Math.floor(t / 60); return `${m}:${(t % 60).toFixed(2).padStart(5, '0')}`; };
+function readBest() { try { const v = parseFloat(localStorage.getItem(BEST_KEY)); return Number.isFinite(v) ? v : null; } catch { return null; } }
+function writeBest(ms) { try { localStorage.setItem(BEST_KEY, String(ms)); } catch { /* ブラウザが保存を許さない */ } }
+function showTimer() { $('timer').style.display = 'block'; }
+function startRun() { runStart = performance.now(); running = true; showTimer(); }
+function stopRun() {
+  if (!running) return null;
+  running = false; runEnd = performance.now();
+  const ms = runEnd - runStart, best = readBest();
+  const record = best == null || ms < best;
+  if (record) writeBest(ms);
+  return { ms, record, best: record ? ms : best };
+}
+function updateTimerHud() {
+  if (!running) return;
+  const best = readBest();
+  $('timer').textContent = `TIME ${fmt(performance.now() - runStart)}` + (best != null ? `　BEST ${fmt(best)}` : '');
+}
+const arrowEl = $('arrow'), hintEl = $('talkhint');
+function updateArrow() {
+  if (state !== 'play') { arrowEl.style.display = 'none'; return; }
+  const p = yuma.group.position;
+  const dx = GOAL.x - p.x, dz = GOAL.z - p.z;
+  const f = dx * Math.sin(camYaw) + dz * Math.cos(camYaw);
+  const r = dx * -Math.cos(camYaw) + dz * Math.sin(camYaw);
+  arrowEl.style.display = 'flex';
+  arrowEl.firstElementChild.style.transform = `rotate(${Math.atan2(r, f)}rad)`;
+  arrowEl.lastElementChild.textContent = `ゴールまで ${Math.max(0, Math.round(Math.hypot(dx, dz)))}m`;
+}
+// ---- 村人に話しかける
+function findNpc() {
+  if (state !== 'play') return null;
+  const p = yuma.group.position;
+  let best = null, bd = 3.0;
+  for (const n of npcs) { const d = Math.hypot(n.ch.group.position.x - p.x, n.ch.group.position.z - p.z); if (d < bd) { bd = d; best = n; } }
+  return best;
+}
+async function talkToNpc(n) {
+  state = 'talk';
+  yuma.play('idle', 0.15);
+  const p = yuma.group.position, q = n.ch.group.position;
+  n.ch.group.rotation.y = Math.atan2(p.x - q.x, p.z - q.z);
+  yuma.group.rotation.y = Math.atan2(q.x - p.x, q.z - p.z);
+  n.ch.play('wave', 0.2);
+  const lines = n.lines[n.count % n.lines.length];
+  n.count++;
+  music.blip(700);
+  await talk(lines.map((t) => [n.name, t]));
+  n.ch.play('idle', 0.3);
+  state = 'play';
+}
+hintEl.addEventListener('pointerdown', (e) => { e.stopPropagation(); if (nearNpc) talkToNpc(nearNpc); });
+
 // ---------------------------------------------------------------- 入力
 addEventListener('keydown', (e) => {
-  if (['Space', 'Enter', 'KeyZ'].includes(e.code)) { e.preventDefault(); if (state !== 'title') advance(); }
+  if (['Space', 'Enter', 'KeyZ'].includes(e.code)) {
+    e.preventDefault();
+    if (state === 'play' && nearNpc && !e.repeat) { talkToNpc(nearNpc); return; }
+    if (state !== 'title') advance();
+  }
   keys[e.code] = true;
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
@@ -498,9 +565,64 @@ function updateFx(dt, time) {
 }
 
 // ---------------------------------------------------------------- 物語の進行
+function popIn(obj, ms = 650) {
+  obj.visible = true;
+  const base = obj.userData.base, t0 = performance.now();
+  return new Promise((res) => {
+    const tick = () => {
+      const k = clamp((performance.now() - t0) / ms, 0, 1);
+      const e = 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2);
+      obj.scale.copy(base).multiplyScalar(Math.max(0.0001, e));
+      if (k >= 1) { obj.scale.copy(base); return res(); }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+}
+function dressHeroOnce() { return dressHero(yuma); }
+function giveGear() { for (const o of Object.values(heroGear)) { o.visible = true; o.scale.copy(o.userData.base); } }
+// 王様の前で、ターバン → マント → 剣 の順に身につける
+async function equipCeremony() {
+  const p = yuma.group.position;
+  const frontCam = () => setCam(new THREE.Vector3(p.x + 2.4, p.y + 1.6, p.z - 3.4), new THREE.Vector3(p.x, p.y + 0.9, p.z));
+  frontCam();
+  const steps = [
+    [heroGear.turban, 'ユウマは ゆうしゃの ターバンを そうび した！　（ぼうぎょ +2）', 1.55],
+    [heroGear.cape, 'ユウマは ゆうしゃの マントを そうび した！　（かっこよさ +30）', 1.0],
+    [heroGear.sword, 'ユウマは おおきな つるぎを そうび した！　（おもい）', 1.0],
+  ];
+  for (const [piece, msg, dy] of steps) {
+    const wp = new THREE.Vector3(); piece.getWorldPosition(wp);
+    popIn(piece);
+    burstSparkles(new THREE.Vector3(p.x, p.y + dy, p.z), 20);
+    music.found();
+    yuma.play('wave', 0.2);
+    await talk([['', msg]]);
+    yuma.play('idle', 0.3);
+  }
+}
+
 async function intro() {
   state = 'cut1';
   music.play('royal');
+  heroGear = heroGear || dressHeroOnce();
+  if (quick) {
+    // タイムアタック：着替え・仲間・城のレベルアップは すませた状態で すぐ スタート
+    giveGear();
+    yuma.group.position.copy(YUMA_MEET);
+    yuma.group.rotation.y = Math.PI;
+    poodle.group.visible = pome.group.visible = true;
+    poodle.group.position.set(YUMA_MEET.x, 3.7, YUMA_MEET.z - 2);
+    pome.group.position.set(YUMA_MEET.x, 3.7, YUMA_MEET.z - 4);
+    trail.length = 0;
+    for (let i = 0; i < 40; i++) trail.push(new THREE.Vector3(YUMA_MEET.x, 3.7, YUMA_MEET.z - 0.3 * (i + 1)));
+    following = true;
+    castle.setLevel(4);
+    showLv('しろレベル　Lv.99');
+    await countdown();
+    beginPlay();
+    return;
+  }
   yuma.group.position.copy(YUMA_START);
   yuma.group.rotation.y = Math.PI;
   setCam(new THREE.Vector3(5, 5.2, YUMA_START.z + 9), new THREE.Vector3(0, 5, -4), true);
@@ -532,9 +654,18 @@ async function intro() {
     ['ぽんねこ', 'ぽんねこで ございます にゃ。 どうぞ おみしりおきを。'],
     ['王様', 'いま この くにに 魔王が ふたたび めざめ、 そらは くもり ひとびとは ふるえて おる。'],
     ['王様', 'そなたの ちからが ひつようなのじゃ。 どうか 魔王を うちたおして おくれ！'],
-    ['王様', 'これは ささやかな ほうしゅうじゃ。 ひのきの ぼうと 5ゴールド！'],
-    ['', 'ユウマは ひのきの ぼうを てにいれた！ …ちょっと かじってみた。'],
-    ['王様', 'ひとりでは しんぱいじゃ。 なかまを しょうかいしよう！ …これ、 はいりなさい！'],
+    ['王様', 'ところで ユウマよ…… その かっこうは、 ちょっと さんぽ すぎる のう。'],
+    ['王様', 'ゆうしゃには ゆうしゃの そうびが ひつようじゃ。 ぽんねこ、 あれを これへ！'],
+    ['ぽんねこ', 'かしこまりました にゃ。'],
+  ]);
+  king.play('idle', 0.4);
+  await equipCeremony();
+  meetCam();
+  king.play('wave', 0.2);
+  await talk([
+    ['ユウマ', 'ワン！ …… どう？ にあう？'],
+    ['王様', 'うむ！ どこから どう みても ゆうしゃじゃ！ …… ただし ひとりでは しんぱいじゃ。'],
+    ['王様', 'なかまを しょうかいしよう！ …… これ、 はいりなさい！'],
   ]);
   king.play('idle', 0.4);
   // 仲間のかけつけ
@@ -551,15 +682,17 @@ async function intro() {
   meetCam();
   poodle.play('wave', 0.2);
   await talk([
-    ['プードル', 'はじめまして ゆうしゃさま。 プードルですわ。 おそばで おつかえ しますの。'],
+    ['プードル', 'あそびにんの プードルですわ。 …… さいころで ぜんぶ きめますの。'],
+    ['プードル', 'たたかいの さいちゅうに あそぶ ことも ありますわ。 ごあんしんなさって？'],
   ]);
   poodle.play('idle', 0.3); pome.play('wave', 0.2);
   await talk([
-    ['ポメ', 'ポメです！ ふわふわで ゆうしゃさまを まもるよ！'],
+    ['ポメ', 'そうりょの ポメです！ けがは ぼくが なおすよ！'],
+    ['ポメ', 'ほんとうは おいのり するだけ だけど、 きもちは こもってるよ！'],
   ]);
   pome.play('idle', 0.3);
   music.found();
-  await talk([['', 'プードルと ポメが なかまに くわわった！']]);
+  await talk([['', 'あそびにんの プードルと、 そうりょの ポメが なかまに くわわった！']]);
   // 縦ならび（ドラクエ2）で ついてくる準備
   trail.length = 0;
   for (let i = 0; i < 40; i++) trail.push(new THREE.Vector3(YUMA_MEET.x, 3.7, YUMA_MEET.z - 0.3 * (i + 1)));
@@ -580,10 +713,26 @@ async function intro() {
   music.bark();
   await talk([['ユウマ', 'ワンッ！ まかせて！']]);
   king.play('idle', 0.4);
-  objective('もくてき：しろの そとへ 出て、 魔王の しろを めざせ！　（ひかりの はしらの むこう）');
+  beginPlay();
+}
+
+function beginPlay() {
+  objective('もくてき：しろの そとへ 出て、 魔王の しろを めざせ！　（矢印の ほうこう）');
   yuma.group.rotation.y = Math.PI;
   state = 'play';
   document.body.classList.add('playing');
+  startRun();
+  subtitle('タイムアタック スタート！　むらびとと おしゃべりすると タイムが のびるぞ', 4200);
+}
+
+async function countdown() {
+  const c = $('count');
+  c.style.display = 'block';
+  setCam(new THREE.Vector3(3.2, 5.2, -13.5), new THREE.Vector3(0, 4.5, -18.5), true);
+  for (const t of ['3', '2', '1']) { c.textContent = t; music.blip(520); await wait(800); }
+  c.textContent = 'GO!'; music.found();
+  await wait(500);
+  c.style.display = 'none';
 }
 
 function moveChar(ch, target, speed = 6.5, camFn) {
@@ -655,6 +804,9 @@ function followerUpdate(ch, gap, dt) {
 let kingCheered = false, hintShown = false;
 async function snackScene() {
   state = 'cut2';
+  hintEl.style.display = 'none';
+  result = stopRun();
+  if (result) $('timer').textContent = `TIME ${fmt(result.ms)}`;
   document.body.classList.remove('playing');
   objective('');
   music.found();
@@ -720,6 +872,9 @@ async function snackScene() {
 
 async function ending() {
   state = 'ending';
+  $('timer').style.display = 'none';
+  $('lv').style.display = 'none';
+  objective('');
   music.play('ending');
   yuma.play('hiphop', 0.3);
   following = false;
@@ -738,13 +893,15 @@ async function ending() {
   $('e2').classList.add('on');
   await wait(3400);
   $('efin').classList.add('on');
-  const sec = Math.round((performance.now() - started) / 1000);
-  $('e3').textContent = `プレイじかん ${Math.floor(sec / 60)}ふん ${sec % 60}びょう`;
+  $('e3').innerHTML = result
+    ? `タイム　<b>${fmt(result.ms)}</b>　${result.record ? '★ しんきろく！ ★' : `ベスト ${fmt(result.best)}`}`
+    : '';
   $('e3').classList.add('on');
   await wait(1200);
   $('again').classList.add('on');
 }
-$('again').addEventListener('click', () => location.reload());
+$('again').addEventListener('click', () => { location.search = '?mode=ta'; });
+$('again2').addEventListener('click', () => { location.search = ''; });
 
 // ---------------------------------------------------------------- メインループ
 const clock = new THREE.Clock();
@@ -765,6 +922,12 @@ function frame() {
       followerUpdate(pome, FOLLOW_GAP[1], dt);
     }
     for (const c of [yuma, king, poodle, pome, butler]) c.mixer.update(dt);
+    for (const n of npcs) n.ch.mixer.update(dt);
+    nearNpc = findNpc();
+    if (nearNpc) { hintEl.style.display = 'block'; hintEl.textContent = `💬 ${nearNpc.name} に はなしかける（スペース / タップ）`; }
+    else hintEl.style.display = 'none';
+    updateArrow();
+    updateTimerHud();
     castle.update(dt, time);
     if (eating) {
       eatBob += dt * 16;
@@ -805,6 +968,38 @@ function twinkle() {
 }
 
 // ---------------------------------------------------------------- 起動
+// ---------------------------------------------------------------- 赤絨毯のわきの村人
+function buildNpcs(ga, gb) {
+  const defs = [
+    { name: '兵士', src: ga, h: 1.75, pos: [-3.6, -13], face: Math.PI / 2, dress: dressGuard, lines: [
+      ['ゆうしゃどの！ ごぶじを いのって おります！ …… あ、 まだ しゅっぱつ して ませんね。', 'いそがば まわれ と いいますが、 いまは いそいだ ほうが いいですぞ。'],
+      ['ふっふっふ。 おしろの もんばんは ひまで ござる。 …… はなしかけてくれて ありがとう。'],
+    ] },
+    { name: '兵士', src: ga, h: 1.75, pos: [3.6, -13], face: -Math.PI / 2, dress: dressGuard, lines: [
+      ['さっき てんしゅが いきなり はえて きて、 ビックリ しました。', 'ここの しゃちほこ、 ドッグフードに みえて きて こまります。'],
+      ['…… ユウマどの。 おしゃべりを する たびに タイムが のびて おりますぞ。'],
+    ] },
+    { name: 'ぽんねこの いとこ', src: gb, h: 1.6, pos: [-3.4, 3], face: Math.PI / 2, dress: dressMerchant, lines: [
+      ['いらっしゃい にゃ！ ぼくは ぽんねこの いとこ。 ぼうぐを うってる にゃ。', 'ゴールドが ない？ …… だったら なにも うれない にゃ。'],
+      ['ここから みなみの はしを わたった さきに、 ひかりの はしらが みえる にゃ。', 'あれが めじるし。 くわしくは がめんの 矢印を みると いい にゃ。'],
+    ] },
+    { name: 'おでんやの おじさん', src: ga, h: 1.7, pos: [3.4, 19], face: -Math.PI / 2, dress: dressOden, lines: [
+      ['しずおかおでん、 くろはんぺん あるよ！ だしこが たっぷり かかるよ！', 'ゆうしゃの たびに おでんは ひつよう だ。 …… って、 いそがなくて いいのかい？'],
+      ['タイム、 はかってるんだろう？ おでんは かえりに よっていきな！'],
+    ] },
+  ];
+  for (const d of defs) {
+    const ch = makeChar({ scene: SkeletonUtils.clone(d.src.scene), animations: d.src.animations }, d.h);
+    ch.group.position.set(d.pos[0], 3.7, d.pos[1]);
+    ch.group.rotation.y = d.face;
+    scene.add(ch.group);
+    ch.group.updateMatrixWorld(true);
+    ch.play('idle', 0);
+    d.dress(ch);
+    npcs.push({ ch, name: d.name, lines: d.lines, count: 0 });
+  }
+}
+
 async function boot() {
   const [gy, ga, gs, gp, gm, gb] = await Promise.all([
     load('yuma', '../../assets/models/yuma/yuma.glb'),
@@ -818,6 +1013,8 @@ async function boot() {
   scene.add(stage);
   stage.updateMatrixWorld(true);
   stage.traverse((o) => { o.matrixAutoUpdate = false; });
+  const ga0 = { scene: SkeletonUtils.clone(ga.scene), animations: ga.animations };
+  const gb0 = { scene: SkeletonUtils.clone(gb.scene), animations: gb.animations };
   yuma = makeChar(gy, 1.6);
   king = makeChar(ga, 1.75);
   yuma.group.position.copy(YUMA_START);
@@ -835,11 +1032,12 @@ async function boot() {
   scene.add(yuma.group, king.group, poodle.group, pome.group, butler.group);
   for (const c of [yuma, king, poodle, pome, butler]) { c.group.updateMatrixWorld(true); c.play('idle', 0); }
   dressKing(king);
-  dressHero(yuma);
+  heroGear = dressHero(yuma);
   dressButler(butler);
-  dressFriend(poodle, 0xe0306a);
-  dressFriend(pome, 0x2a7ae0);
+  dressJester(poodle);
+  dressPriest(pome);
   buildProps();
+  buildNpcs(ga0, gb0);
   castle = buildCastle(scene);
   camera.position.set(8, 6.5, -4);
   camLook.set(0, 5, -20);
@@ -850,17 +1048,29 @@ async function boot() {
   window.__game = { THREE, scene, camera, yuma, king, poodle, pome, butler, castle, castleShow, setCam, snackScene, ending, get state() { return state; }, groundAt, set camYaw(v) { camYaw = v; } };
   // タイトル画面ではお城を見せる
   setCam(new THREE.Vector3(7, 6.2, -9), new THREE.Vector3(0, 4.8, -24), true);
-  const startGame = () => {
+  const items = [...document.querySelectorAll('#title .menu .item')];
+  let sel = DEBUG.get('mode') === 'ta' ? 1 : 0;
+  const paint = () => items.forEach((el, i) => { el.firstElementChild.textContent = i === sel ? '▶' : ''; });
+  paint();
+  const startGame = (mode) => {
     if (state !== 'title') return;
+    quick = mode === 1;
     $('title').style.display = 'none';
     music.start();
     started = performance.now();
     intro();
   };
-  $('title').addEventListener('pointerdown', startGame);
+  items.forEach((el, i) => {
+    el.addEventListener('pointerenter', () => { sel = i; paint(); });
+    el.addEventListener('pointerdown', (e) => { e.stopPropagation(); sel = i; paint(); startGame(i); });
+  });
   twinkle();
-  addEventListener('keydown', (e) => { if (state === 'title' && ['Space', 'Enter'].includes(e.code)) startGame(); });
-  if (DEBUG.has('autostart')) startGame();
+  addEventListener('keydown', (e) => {
+    if (state !== 'title') return;
+    if (['ArrowUp', 'ArrowDown', 'KeyW', 'KeyS'].includes(e.code)) { sel = 1 - sel; paint(); music.blip(600); }
+    if (['Space', 'Enter'].includes(e.code)) startGame(sel);
+  });
+  if (DEBUG.has('autostart')) startGame(DEBUG.get('autostart') === 'ta' ? 1 : 0);
 }
 frame();
 boot().catch((e) => { $('loadmsg').textContent = 'よみこみに しっぱいしました: ' + e.message; console.error(e); });
