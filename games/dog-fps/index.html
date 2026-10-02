@@ -30,9 +30,17 @@
   #cross::after { top: 10px; left: 0; height: 2px; width: 22px; }
   #top { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; font-size: 20px; }
   #top > div { background: rgba(255,248,236,.9); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 12px; }
-  #hearts { color: #e8375a; letter-spacing: 2px; }
-  #treats { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
-  .treat { white-space: nowrap; background: rgba(255,248,236,.9); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 10px; font-size: 15px; opacity: .6; }
+  #hearts { color: #e8375a; letter-spacing: 2px; font-size: 22px; }
+  #me { position: absolute; left: 14px; bottom: 14px; display: flex; align-items: center; gap: 10px; background: rgba(255,248,236,.92); border: 3px solid var(--ink); border-radius: 16px; padding: 6px 16px 6px 6px; }
+  #me img { width: 72px; height: 72px; border-radius: 50%; border: 3px solid var(--ink); background: #cfe8fb; }
+  #me b { font-size: 22px; display: block; }
+  #ammo { position: absolute; right: 14px; top: 62px; background: rgba(255,248,236,.92); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 14px; font-size: 20px; }
+  #ammo b { font-size: 26px; }
+  #ammo.low { background: #ffd0c8; }
+  .card img:not([src]) { visibility: hidden; }
+  .card img { width: 64px; height: 64px; border-radius: 50%; border: 3px solid var(--ink); background: #cfe8fb; display: block; margin: 0 auto 4px; }
+  #treats { position: absolute; bottom: 14px; max-width: calc(100vw - 440px);  flex-wrap: wrap; justify-content: center; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+  .treat { white-space: nowrap; background: rgba(255,248,236,.9); border: 3px solid var(--ink); border-radius: 12px; padding: 3px 8px; font-size: 13px; opacity: .6; }
   .treat.on { opacity: 1; background: #ffe07a; transform: translateY(-4px); }
   .treat i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; border: 1px solid var(--ink); }
   #toast { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 30px; color: #fff; text-shadow: 0 3px 0 var(--ink); white-space: nowrap; transition: opacity .4s; opacity: 0; }
@@ -65,10 +73,13 @@
 <div id="hud" class="hidden">
   <div id="cross"></div>
   <div id="top">
-    <div id="hearts"></div>
+    <div id="wave"></div>
     <div id="fed"></div>
+    <div id="score"></div>
     <div id="time"></div>
   </div>
+  <div id="me"><img id="meFace" alt=""><div><b id="meName"></b><div id="hearts"></div></div></div>
+  <div id="ammo"></div>
   <div id="treats"></div>
   <div id="toast"></div>
   <div id="flash"></div>

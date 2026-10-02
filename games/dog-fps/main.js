@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 // ---------------------------------------------------------------------------
 // データ（好物や大きさはここで変えられる）
@@ -26,6 +27,12 @@ const CHARS = {
 // 舞台: 箱庭の安倍川公園（glTF 座標。-Z が北）
 const ARENA = { minX: -394, maxX: -346, minZ: -158, maxZ: 68 };
 const SPAWN = new THREE.Vector3(-370, 0, 55);
+
+const WAVES = [4, 6, 8];      // 各ウェーブの敵の数（ぜんぶ止めたらクリア）
+const AMMO_START = 10, AMMO_MAX = 20, AMMO_PER_WAVE = 6, AMMO_PER_BOX = 8;
+const BOX_COUNT = 2;          // 地面に置くオヤツ箱の数
+// 手元に見せる毛・肌の色
+const SKIN = { yuma: '#6b4430', poodle: '#c98a4b', pome: '#f2f0ec', ponneko: '#e8a050', atchi: '#f0c9a0' };
 
 const PLAYER_HEARTS = 3;
 const WALK = 4.5, RUN = 8;
@@ -125,25 +132,38 @@ function pushOut(pos, radius, feetY) {
   pos.z = Math.max(ARENA.minZ, Math.min(ARENA.maxZ, pos.z));
 }
 
-// キャラ: glb を読み、足の裏が 0・見せ寸の高さになる入れ物に入れる
-async function loadChar(id) {
+// キャラ: glb を読んでおく（同じ子を何体も出せるよう、出すたびに複製する）
+async function loadProto(id) {
   const c = CHARS[id];
   const gltf = await load(`lite/${id}.glb`);
-  const model = gltf.scene;
-  model.traverse((o) => { if (o.isSkinnedMesh || o.isMesh) o.frustumCulled = false; });
-  const box = new THREE.Box3().setFromObject(model);
+  const box = new THREE.Box3().setFromObject(gltf.scene);
   const s = c.height / (box.max.y - box.min.y);
-  model.scale.setScalar(s);
-  model.position.y = -box.min.y * s;
+  return { id, ...c, gltf, s, footY: -box.min.y * s };
+}
+
+// 足の裏が 0・見せ寸の高さになる入れ物に入れる
+function buildChar(proto) {
+  const model = cloneSkinned(proto.gltf.scene);
+  model.traverse((o) => { if (o.isSkinnedMesh || o.isMesh) o.frustumCulled = false; });
+  model.scale.setScalar(proto.s);
+  model.position.y = proto.footY;
   const root = new THREE.Group();
   const body = new THREE.Group(); // 揺れや傾きはこちらにかける
   body.add(model);
   root.add(body);
   const mixer = new THREE.AnimationMixer(model);
-  const clips = Object.fromEntries(gltf.animations.map((a) => [a.name, a]));
+  const clips = Object.fromEntries(proto.gltf.animations.map((a) => [a.name, a]));
   const bones = {};
   model.traverse((o) => { if (o.isBone) bones[o.name] = o; });
-  return { id, ...c, root, body, model, mixer, clips, bones, action: null };
+  const ch = { id: proto.id, name: proto.name, kind: proto.kind, height: proto.height, fav: proto.fav, root, body, model, mixer, clips, bones, action: null };
+  ch.label = textSprite(`${ch.name}　すき: ${TREATS[ch.fav].name}`, { size: 36 });
+  root.add(ch.label);
+  // 食べているオヤツ（足元の前）
+  ch.treat = makeTreatMesh(ch.fav);
+  ch.treat.position.set(0, 0.05, 0.45);
+  ch.treat.visible = false;
+  root.add(ch.treat);
+  return ch;
 }
 
 function play(ch, name, speed = 1) {
@@ -248,6 +268,7 @@ function beep(freq, dur, type = 'square', vol = 0.12, slide = 0) {
 const sfx = {
   throw: () => beep(500, 0.12, 'triangle', 0.15, 300),
   yum: () => { beep(660, 0.1, 'square', 0.08); setTimeout(() => beep(880, 0.1, 'square', 0.08), 90); setTimeout(() => beep(1320, 0.18, 'square', 0.08), 180); },
+  pickup: () => { beep(784, 0.08, 'square', 0.08); setTimeout(() => beep(1047, 0.12, 'square', 0.08), 70); },
   nope: () => beep(220, 0.25, 'sawtooth', 0.08, -80),
   hurt: () => beep(160, 0.35, 'sawtooth', 0.15, -100),
   growl: () => beep(90, 0.4, 'sawtooth', 0.05, 30),
@@ -266,11 +287,58 @@ let treatIdx = 0;
 let mode = 'loading'; // loading / select / play / pause / result
 let elapsed = 0;
 let throwCool = 0;
+let wave = 0, score = 0, ammo = 0, combo = 0, comboT = 0, nextWaveT = -1;
+let boxes = [];
+let portraitWait = 0;
+const protos = {};
+const portraits = {};
 const keys = {};
 
 function setTreat(i) {
   treatIdx = (i + TREAT_KEYS.length) % TREAT_KEYS.length;
   document.querySelectorAll('.treat').forEach((el, j) => el.classList.toggle('on', j === treatIdx));
+  refreshViewTreat();
+}
+
+// ---------------------------------------------------------------------------
+// 手元（画面の右下に、自分の手とオヤツを見せる）
+// ---------------------------------------------------------------------------
+const view = new THREE.Group();
+const holder = new THREE.Group();
+view.add(holder);
+camera.add(view);
+scene.add(camera);
+view.visible = false;
+let viewTreat = null, viewKick = 0;
+function overlay(obj) {
+  obj.traverse((o) => { if (o.isMesh) { o.renderOrder = 999; o.material.depthTest = false; o.material.depthWrite = false; } });
+}
+function refreshViewTreat() {
+  if (viewTreat) holder.remove(viewTreat);
+  viewTreat = makeTreatMesh(TREAT_KEYS[treatIdx]);
+  viewTreat.position.set(0, 0.11, -0.02);
+  viewTreat.scale.setScalar(0.75);
+  overlay(viewTreat);
+  holder.add(viewTreat);
+}
+function buildView(ch) {
+  holder.clear();
+  const skin = new THREE.MeshStandardMaterial({ color: SKIN[ch.id], roughness: 0.8 });
+  const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.22, 4, 10), skin);
+  arm.rotation.x = -Math.PI / 2;
+  arm.position.set(0, 0, 0.17);
+  const paw = new THREE.Mesh(new THREE.SphereGeometry(0.065, 14, 10), skin);
+  holder.add(arm, paw);
+  overlay(holder);
+  viewTreat = null;
+  refreshViewTreat();
+}
+function updateView(dt, t, moving) {
+  viewKick = Math.max(0, viewKick - dt * 4);
+  const k = Math.sin(viewKick * Math.PI / 1.0) ;
+  const sway = moving ? Math.sin(t * 10) * 0.012 : Math.sin(t * 2) * 0.004;
+  holder.position.set(0.24, -0.26 + sway, -0.55 - k * 0.3);
+  holder.rotation.set(0.3 - k * 0.7, 0.12, 0);
 }
 
 function toast(text, ms = 1400) {
@@ -282,8 +350,41 @@ function toast(text, ms = 1400) {
 function updateHud() {
   $('hearts').textContent = '♥'.repeat(player.hearts) + '♡'.repeat(PLAYER_HEARTS - player.hearts);
   const fed = enemies.filter((e) => e.state === 'eat').length;
+  $('wave').textContent = `ウェーブ ${wave} / ${WAVES.length}`;
   $('fed').textContent = `夢中: ${fed} / ${enemies.length}`;
+  $('score').textContent = `${score} 点` + (combo > 1 && comboT > 0 ? `　${combo}コンボ！` : '');
   $('time').textContent = `${elapsed.toFixed(1)} 秒`;
+  $('ammo').innerHTML = `オヤツ <b>×${ammo}</b>`;
+  $('ammo').classList.toggle('low', ammo <= 2);
+}
+
+// 顔写真（キャラ選びで並べた状態から、顔だけを撮る）
+const portraitRT = new THREE.WebGLRenderTarget(160, 160);
+portraitRT.texture.colorSpace = THREE.SRGBColorSpace;
+function makePortrait(ch) {
+  const size = 160;
+  const saved = scene.children.map((o) => [o, o.visible]);
+  const bg = scene.background, fog = scene.fog;
+  scene.children.forEach((o) => { if (!o.isLight) o.visible = false; });
+  ch.root.visible = true; ch.label.visible = false;
+  scene.background = new THREE.Color('#cfe8fb'); scene.fog = null;
+  const cam = new THREE.PerspectiveCamera(28, 1, 0.05, 50);
+  const p = ch.root.position, h = ch.height;
+  cam.position.set(p.x, p.y + h * 0.82, p.z + h * 1.1);
+  cam.lookAt(p.x, p.y + h * 0.82, p.z);
+  renderer.setRenderTarget(portraitRT);
+  renderer.render(scene, cam);
+  renderer.setRenderTarget(null);
+  saved.forEach(([o, v]) => { o.visible = v; });
+  scene.background = bg; scene.fog = fog;
+  const buf = new Uint8Array(size * size * 4);
+  renderer.readRenderTargetPixels(portraitRT, 0, 0, size, size, buf);
+  const cv = document.createElement('canvas'); cv.width = cv.height = size;
+  const ctx = cv.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  for (let y = 0; y < size; y++) img.data.set(buf.subarray((size - 1 - y) * size * 4, (size - y) * size * 4), y * size * 4);
+  ctx.putImageData(img, 0, 0);
+  return cv.toDataURL('image/png');
 }
 
 // ---------------------------------------------------------------------------
@@ -295,6 +396,9 @@ function showSelect() {
   $('select').classList.remove('hidden');
   $('hud').classList.add('hidden');
   $('result').classList.add('hidden');
+  view.visible = false;
+  for (const e of enemies) scene.remove(e.root);
+  enemies = [];
   const cx = SPAWN.x, cz = SPAWN.z - 6;
   LINEUP.forEach((id, i) => {
     const ch = chars[id];
@@ -317,7 +421,7 @@ function showSelect() {
     const c = CHARS[id];
     const el = document.createElement('div');
     el.className = 'card';
-    el.innerHTML = `<b>${c.name}</b><small>${c.kind}</small>`;
+    el.innerHTML = `<img data-id="${id}" ${portraits[id] ? `src="${portraits[id]}"` : ''} alt=""><b>${c.name}</b><small>${c.kind}</small>`;
     el.onmouseenter = () => play(chars[id], 'wave');
     el.onmouseleave = () => play(chars[id], 'idle');
     el.onclick = () => startGame(id);
@@ -325,56 +429,142 @@ function showSelect() {
   }
 }
 
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
 function startGame(id) {
   $('select').classList.add('hidden');
   $('result').classList.add('hidden');
   $('hud').classList.remove('hidden');
   player.char = chars[id];
-  player.char.root.visible = false;
+  LINEUP.forEach((k) => { chars[k].root.visible = false; });
   player.eye = player.char.height * 0.92;
   player.pos.copy(SPAWN);
   player.pos.y = groundAt(SPAWN.x, SPAWN.z, 5) ?? -2.2;
   player.vy = 0; player.hearts = PLAYER_HEARTS; player.invuln = 0;
   camera.rotation.set(0, 0, 0); // 北（-Z）を向く
   for (const t of [...flying, ...dropped]) scene.remove(t.mesh);
-  flying = []; dropped = [];
-  elapsed = 0;
-
-  enemies = LINEUP.filter((k) => k !== id).map((k, i, arr) => {
-    const ch = chars[k];
-    const spread = (i - (arr.length - 1) / 2) * 9;
-    const x = SPAWN.x + spread + (Math.random() - 0.5) * 3;
-    const z = SPAWN.z - 22 - Math.random() * 8 - (k === 'atchi' ? 10 : 0);
-    ch.root.visible = true;
-    ch.root.position.set(x, groundAt(x, z, 5) ?? -2.2, z);
-    ch.label.visible = true;
-    ch.treat.visible = false;
-    ch.state = 'chase';
-    ch.stopT = 0; ch.lungeT = 0; ch.nextLunge = 2 + Math.random() * 3;
-    ch.phase = Math.random() * 10;
-    ch.speed = k === 'atchi' ? 2.0 : 2.4 + Math.random() * 0.4;
-    ch.heartT = 0;
-    play(ch, k === 'atchi' ? 'walk_original' : 'walk', 1.6);
-    return ch;
-  });
-  setTreat(TREAT_KEYS.indexOf(enemies[0].fav));
-  updateHud();
+  for (const e of enemies) scene.remove(e.root);
+  flying = []; dropped = []; enemies = [];
+  elapsed = 0; score = 0; combo = 0; comboT = 0; nextWaveT = -1;
+  ammo = AMMO_START - AMMO_PER_WAVE; // 第1波の開始で AMMO_PER_WAVE 足される
+  if (portraits[id]) $('meFace').src = portraits[id];
+  $('meName').textContent = player.char.name;
+  buildView(player.char);
+  view.visible = true;
+  setupBoxes();
+  startWave(1);
   mode = 'pause';
   $('pause').classList.remove('hidden');
-  toast('好物をあげてとめよう！', 2500);
+}
+
+function spawnEnemy(id, n) {
+  const ch = buildChar(protos[id]);
+  scene.add(ch.root);
+  let x, z, tries = 0;
+  do {
+    const a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 10;
+    x = player.pos.x + Math.sin(a) * r; z = player.pos.z + Math.cos(a) * r; tries++;
+  } while (tries < 40 && (x < ARENA.minX + 2 || x > ARENA.maxX - 2 || z < ARENA.minZ + 2 || z > ARENA.maxZ - 2 || groundAt(x, z, 3) === null));
+  if (tries >= 40) { x = player.pos.x; z = Math.max(ARENA.minZ + 2, player.pos.z - 25); }
+  ch.root.position.set(x, groundAt(x, z, 3) ?? -2.2, z);
+  ch.state = 'chase';
+  ch.stopT = 0; ch.lungeT = 0; ch.nextLunge = 2 + Math.random() * 3;
+  ch.phase = Math.random() * 10;
+  ch.speed = (id === 'atchi' ? 2.0 : 2.4 + Math.random() * 0.4) * (1 + 0.1 * (n - 1));
+  ch.heartT = 0;
+  play(ch, id === 'atchi' ? 'walk_original' : 'walk', 1.6);
+  return ch;
+}
+
+function startWave(n) {
+  wave = n;
+  for (const e of enemies) scene.remove(e.root);
+  const others = shuffle(LINEUP.filter((k) => k !== player.char.id));
+  enemies = [];
+  for (let i = 0; i < WAVES[n - 1]; i++) enemies.push(spawnEnemy(others[i % others.length], n));
+  ammo = Math.min(AMMO_MAX, ammo + AMMO_PER_WAVE);
+  if (n > 1 && player.hearts < PLAYER_HEARTS) player.hearts++;
+  setTreat(TREAT_KEYS.indexOf(enemies[0].fav));
+  toast(n === 1 ? '好物をあげてとめよう！' : `ウェーブ ${n}！ ${enemies.length}人くるよ`, 2500);
+  updateHud();
+}
+
+function waveCleared() {
+  if (nextWaveT > 0) return;
+  score += 200;
+  toast(wave >= WAVES.length ? '全ウェーブクリア！ +200' : `ウェーブ ${wave} クリア！ +200`, 2500);
+  nextWaveT = wave >= WAVES.length ? 1.5 : 3;
+  updateHud();
+}
+
+// オヤツ箱: 近くを通るとオヤツがふえる
+function makeBoxMesh() {
+  const g = new THREE.Group();
+  const crate = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 0.6), new THREE.MeshStandardMaterial({ color: '#c98a4b', roughness: 0.8 }));
+  crate.position.y = 0.225;
+  const band = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.12, 0.62), new THREE.MeshStandardMaterial({ color: '#ffd23f', roughness: 0.6 }));
+  band.position.y = 0.3;
+  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 14, 16, 1, true), new THREE.MeshBasicMaterial({ color: '#ffe36a', transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }));
+  beacon.position.y = 7;
+  const tag = textSprite('オヤツ箱', { size: 40 });
+  tag.position.y = 1.1;
+  g.add(crate, band, beacon, tag);
+  g.userData.crate = crate;
+  return g;
+}
+function placeBox(b) {
+  let x, z, tries = 0;
+  do {
+    const a = Math.random() * Math.PI * 2, r = 8 + Math.random() * 16;
+    x = player.pos.x + Math.sin(a) * r; z = player.pos.z + Math.cos(a) * r; tries++;
+  } while (tries < 40 && (x < ARENA.minX + 2 || x > ARENA.maxX - 2 || z < ARENA.minZ + 2 || z > ARENA.maxZ - 2 || groundAt(x, z, 3) === null));
+  b.mesh.position.set(x, groundAt(x, z, 3) ?? -2.2, z);
+  b.mesh.visible = true;
+  b.respawn = 0;
+}
+function setupBoxes() {
+  for (const b of boxes) scene.remove(b.mesh);
+  boxes = [];
+  for (let i = 0; i < BOX_COUNT; i++) {
+    const b = { mesh: makeBoxMesh(), respawn: 0 };
+    scene.add(b.mesh);
+    placeBox(b);
+    boxes.push(b);
+  }
+}
+function updateBoxes(dt, t) {
+  for (const b of boxes) {
+    if (b.respawn > 0) { b.respawn -= dt; if (b.respawn <= 0) placeBox(b); continue; }
+    b.mesh.userData.crate.rotation.y = t * 1.5;
+    const p = b.mesh.position;
+    if (ammo < AMMO_MAX && Math.hypot(player.pos.x - p.x, player.pos.z - p.z) < 1.5 && Math.abs(player.pos.y - p.y) < 2) {
+      ammo = Math.min(AMMO_MAX, ammo + AMMO_PER_BOX);
+      b.mesh.visible = false; b.respawn = 8;
+      sfx.pickup();
+      toast(`オヤツ +${AMMO_PER_BOX}`, 1000);
+      updateHud();
+    }
+  }
 }
 
 function endGame(win) {
   mode = 'result';
   document.exitPointerLock?.();
+  view.visible = false;
+  for (const b of boxes) b.mesh.visible = false;
   $('pause').classList.add('hidden');
   $('hud').classList.add('hidden');
   $('result').classList.remove('hidden');
   $('resultTitle').textContent = win ? 'みんなオヤツに夢中！' : 'つかまった〜！';
-  const fed = enemies.filter((e) => e.state === 'eat').length;
-  $('resultText').innerHTML = win
-    ? `${player.char.name}の勝ち！　${elapsed.toFixed(1)} 秒で全員とめた`
-    : `${enemies.length} 人中 ${fed} 人をオヤツでとめた（${elapsed.toFixed(1)} 秒）`;
+  let best = 0;
+  try { best = +localStorage.getItem('dogfps.best') || 0; if (score > best) { best = score; localStorage.setItem('dogfps.best', String(score)); } } catch { best = Math.max(best, score); }
+  $('resultText').innerHTML = (win
+    ? `${player.char.name}の勝ち！　${WAVES.length} ウェーブぜんぶクリア（${elapsed.toFixed(1)} 秒）`
+    : `ウェーブ ${wave} でつかまった…（${elapsed.toFixed(1)} 秒）`)
+    + `<br><b style="font-size:24px">${score} 点</b>　ベスト ${best} 点`;
   if (win) sfx.win(); else sfx.hurt();
 }
 $('again').onclick = () => showSelect();
@@ -408,7 +598,9 @@ addEventListener('keyup', (e) => { keys[e.code] = false; });
 const fwd = new THREE.Vector3();
 function throwTreat() {
   if (throwCool > 0) return;
+  if (ammo <= 0) { throwCool = 0.5; sfx.nope(); toast('オヤツがない！オヤツ箱をさがそう', 1500); return; }
   throwCool = 0.35;
+  ammo--; viewKick = 1; updateHud();
   const key = TREAT_KEYS[treatIdx];
   const mesh = makeTreatMesh(key);
   camera.getWorldDirection(fwd);
@@ -449,9 +641,13 @@ function feed(e, key) {
     e.label.visible = false;
     play(e, 'idle', 0.6);
     sfx.yum();
-    toast(`${e.name}、${TREATS[key].name}に夢中！`);
     for (let i = 0; i < 6; i++) heart(e.root.position.clone().add(vC.set((Math.random() - 0.5), e.height + Math.random() * 0.5, (Math.random() - 0.5))));
-    if (enemies.every((x) => x.state === 'eat')) setTimeout(() => endGame(true), 1200);
+    combo = comboT > 0 ? combo + 1 : 1; comboT = 4;
+    const near = Math.hypot(player.pos.x - e.root.position.x, player.pos.z - e.root.position.z) < 6 ? 50 : 0;
+    const pts = 100 + (combo - 1) * 50 + near;
+    score += pts;
+    floatUp(textSprite(`ナイス！ +${pts}` + (combo > 1 ? `　${combo}コンボ` : ''), { color: '#d1431f', size: 40 }), e.root.position.clone().add(vC.set(0, e.height + 0.9, 0)), 1.8);
+    if (enemies.every((x) => x.state === 'eat')) waveCleared();
   } else {
     e.state = 'sniff';
     e.stopT = WRONG_TREAT_STOP;
@@ -557,11 +753,25 @@ function tick() {
   if (mode === 'select') {
     for (const id of LINEUP) chars[id].mixer.update(dt);
   }
+  if (mode === 'pause') updateView(dt, t, false);
+  // 顔写真は、絵（テクスチャ）が読み終わった数フレーム後に撮る
+  if ((mode === 'select' || mode === 'pause') && !portraits.done && ++portraitWait > 20) {
+    for (const id of LINEUP) { chars[id].mixer.update(0.3); chars[id].root.updateMatrixWorld(true); }
+    for (const id of LINEUP) portraits[id] = makePortrait(chars[id]);
+    portraits.done = true;
+    document.querySelectorAll('.card img').forEach((im) => { im.src = portraits[im.dataset.id]; });
+    if (player.char) $('meFace').src = portraits[player.char.id];
+  }
 
   if (mode === 'play') {
     elapsed += dt;
     throwCool -= dt;
     player.invuln -= dt;
+    comboT -= dt;
+    if (nextWaveT > 0) {
+      nextWaveT -= dt;
+      if (nextWaveT <= 0) { nextWaveT = -1; if (wave >= WAVES.length) endGame(true); else startWave(wave + 1); }
+    }
 
     // 歩く
     const sp = keys.ShiftLeft || keys.ShiftRight ? RUN : WALK;
@@ -582,6 +792,8 @@ function tick() {
     camera.position.set(player.pos.x, player.pos.y + player.eye + bob, player.pos.z);
 
     for (const e of enemies) updateEnemy(e, dt, t);
+    updateBoxes(dt, t);
+    updateView(dt, t, move.lengthSq() > 0);
 
     // 飛んでいるオヤツ
     for (const f of flying) {
@@ -636,17 +848,11 @@ function tick() {
 // はじめ
 // ---------------------------------------------------------------------------
 async function main() {
-  const [, ...list] = await Promise.all([loadStage(), ...LINEUP.map(loadChar)]);
-  for (const ch of list) {
-    chars[ch.id] = ch;
-    scene.add(ch.root);
-    ch.label = textSprite(`すき: ${TREATS[ch.fav].name}`, { size: 36 });
-    ch.root.add(ch.label);
-    // 食べているオヤツ（足元の前）
-    ch.treat = makeTreatMesh(ch.fav);
-    ch.treat.position.set(0, 0.05, 0.45);
-    ch.treat.visible = false;
-    ch.root.add(ch.treat);
+  const [, ...list] = await Promise.all([loadStage(), ...LINEUP.map(loadProto)]);
+  for (const p of list) {
+    protos[p.id] = p;
+    chars[p.id] = buildChar(p);
+    scene.add(chars[p.id].root);
   }
   $('treats').innerHTML = TREAT_KEYS.map((k, i) => `<div class="treat"><i style="background:${TREATS[k].color}"></i>${i + 1} ${TREATS[k].name}</div>`).join('');
   $('loading').classList.add('hidden');
@@ -659,4 +865,4 @@ main().catch((err) => {
 });
 
 // 動作確認用（ブラウザのコンソールから触れる）
-window.__game = { chars, player, get enemies() { return enemies; }, startGame, showSelect, feed, get mode() { return mode; }, set mode(v) { mode = v; }, camera };
+window.__game = { portraits, chars, player, startWave, get score() { return score; }, get ammo() { return ammo; }, set ammo(v) { ammo = v; }, get wave() { return wave; }, get boxes() { return boxes; }, throwTreat, setTreat, get enemies() { return enemies; }, startGame, showSelect, feed, get mode() { return mode; }, set mode(v) { mode = v; }, camera };
