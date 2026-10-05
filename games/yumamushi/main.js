@@ -4,7 +4,7 @@ import { MeshoptDecoder } from 'three/addons/meshopt_decoder.module.js';
 
 // ---------- 設定 ----------
 const Q = new URLSearchParams(location.search);
-const CHICK_DIST = Q.has('near') ? 4 : 22;   // ヒヨコまでの距離（?near で近く：動作確認用）
+const CHICK_DIST = Q.has('near') ? 4 : 11;   // ヒヨコまでの距離（?near で近く：動作確認用）
 const WAVE_SPEED = 5.0;                      // 這う波の速さ（rad/秒）
 const WAVE_JOINT = 0.9;                      // 隣の節との位相ずれ（README の見本と同じ）
 const WAVE_AMP = 0.11;                       // 上下の振れ（箱庭の見本と同じ）
@@ -362,7 +362,7 @@ function updateChick(dt, t) {
   const dist = toCat.length();
   chickAI.t += dt;
   let speed = 0;
-  if (state === 'play' && dist < 11) {            // 気づいて、とことこ近づく
+  if (state === 'play' && dist < 7) {            // 気づいて、とことこ近づく
     speed = 0.9;
     const want = Math.atan2(toCat.x, toCat.z);
     chick.rotation.y = lerpAngle(chick.rotation.y, want, 4 * dt);
