@@ -19,3 +19,7 @@ GitHub Pages: `https://atchumaaibo-cyber.github.io/game/games/yumamushi/`
 - 蛹→犬に戻る「動画」は素材がなかったので、3D演出（糸のきらめき・ぶるぶる・発光・フラッシュ・紙吹雪・ティロリロリン）で代用
 - 音は音源ファイルなし。Web Audio の自作シンセ
 - Three.js r170 を `lib/` に同梱（CDN 不要）
+
+## 蛹→犬の動画を差し替える
+
+動画生成AIなどで作った動画を `games/yumamushi/media/hanka.mp4` という名前で置くと、3D演出のかわりにその動画が流れ（終わると犬が登場）、置かなければ3D演出になる。縦長（スマホ向け）・数秒〜10秒ほどがおすすめ。
