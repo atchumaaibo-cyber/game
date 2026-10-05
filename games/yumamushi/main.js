@@ -9,6 +9,7 @@ const WAVE_SPEED = 5.0;                      // 這う波の速さ（rad/秒）
 const WAVE_JOINT = 0.9;                      // 隣の節との位相ずれ（README の見本と同じ）
 const WAVE_AMP = 0.11;                       // 上下の振れ（箱庭の見本と同じ）
 const FIELD_X = 9;
+const INTRO_TIME = 3.6;                      // はじまりの顔アップ演出の長さ（秒）
 
 const $ = (id) => document.getElementById(id);
 const isPortrait = () => innerWidth < innerHeight;
@@ -305,6 +306,9 @@ async function init() {
 function startGame() {
   initAudio();
   $('title').style.display = 'none';
+  setState('intro');          // 顔のアップ → カメラが後ろにまわる → ゲーム開始
+}
+function beginPlay() {
   $('hud').style.display = 'block'; $('steer').style.display = 'block'; $('hint').style.display = 'block';
   setTimeout(() => { $('hint').style.display = 'none'; }, 5000);
   setState('play');
@@ -441,7 +445,11 @@ function updateScene(dt) {
   const fwd = new THREE.Vector3(Math.sin(heading.v), 0, Math.cos(heading.v));
   let moving = false, curl = 0;
 
-  if (state === 'play') {
+  if (state === 'intro') {
+    animateCat(dt, false);
+    updateChick(dt, t);
+    if (t > INTRO_TIME) beginPlay();
+  } else if (state === 'play') {
     // ステアリング
     const kb = (keyR ? 1 : 0) - (keyL ? 1 : 0);
     if (kb) steerInput = kb; else if (!dragging) steerInput *= Math.pow(0.02, dt);
@@ -547,10 +555,22 @@ function updateCamera(dt) {
   if (state === 'title') {
     const a = performance.now() / 6000;
     want = new THREE.Vector3(Math.sin(a) * 4, 2.2, -3.5); look = new THREE.Vector3(0, .4, 0);
-  } else if (state === 'play') {
+  } else if (state === 'play' || state === 'intro') {
     const back = portrait ? 4.0 : 3.2, h = portrait ? 2.1 : 1.6;
     want = catPos.clone().addScaledVector(fwd, -back); want.y = h;
     look = catPos.clone().addScaledVector(fwd, 1.6); look.y = 0.35;
+    if (state === 'intro') {
+      // 顔のアップ（正面）から、ぐるっと後ろへ
+      const u = Math.min(1, timeInState / INTRO_TIME), e = u * u * (3 - 2 * u);
+      const ang = Math.PI * (1 - e);
+      const r = THREE.MathUtils.lerp(1.5, back, e), y = THREE.MathUtils.lerp(0.42, h, e);
+      const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
+      // ang=π → 正面(+fwd)、ang=0 → 真後ろ(-fwd)
+      want = catPos.clone().addScaledVector(side, Math.sin(ang) * r).addScaledVector(fwd, -Math.cos(ang) * r); want.y = y;
+      const headPt = catPos.clone().addScaledVector(fwd, 0.35); headPt.y = 0.28;
+      look = headPt.lerp(look, e);
+      camPos.copy(want); camLook.copy(look);
+    }
   } else {
     // 演出中：ユウマとヒヨコを横から見るカメラ
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
