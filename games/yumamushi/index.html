@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>ユウマムシの大冒険 [PR#11]</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  :root { --ui: 'DotGothic16', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: var(--ui); color: #fff; user-select: none; -webkit-user-select: none; touch-action: none; }
+  canvas#c { display: block; width: 100%; height: 100%; }
+  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 16px; }
+  .win { background: rgba(10, 30, 0, .82); border: 4px solid #fff; border-radius: 12px; box-shadow: 0 0 0 3px #000, 0 6px 20px rgba(0,0,0,.4); }
+  #loading { background: #0b1a05; z-index: 30; }
+  #loading .bar { width: min(70vw, 420px); height: 14px; border: 3px solid #fff; margin-top: 18px; }
+  #loading .bar i { display: block; height: 100%; width: 0; background: #9be04a; }
+  #title { z-index: 20; display: none; cursor: pointer; background: linear-gradient(#bfe8ff 0%, #e9f8c8 60%, #7ec850 100%); overflow: hidden; }
+  #title .logo { position: relative; font-weight: 900; font-size: clamp(34px, 11vw, 120px); line-height: 1.12; letter-spacing: .02em; margin: 0;
+    color: #8fe030; -webkit-text-stroke: clamp(4px, 1vw, 10px) #2d5a0a; paint-order: stroke fill; text-shadow: 0 6px 0 #1d3b05; animation: wig 1.6s ease-in-out infinite; }
+  #title .sub { position: relative; font-size: clamp(14px, 3.8vw, 24px); color: #26480a; margin: 10px 0 28px; letter-spacing: .12em; }
+  #title .go { position: relative; font-size: clamp(18px, 5vw, 30px); padding: 14px 34px; animation: blink 1.1s steps(2) infinite; }
+  #title .how { position: relative; margin-top: 22px; font-size: clamp(11px, 3vw, 16px); color: #26480a; line-height: 1.8; }
+  #title .ver { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: 12px; font-size: clamp(12px, 3vw, 16px); padding: 3px 10px; border: 2px solid #2d5a0a; border-radius: 6px; color: #2d5a0a; background: rgba(255,255,255,.7); }
+  #title .copy { position: absolute; bottom: 10px; left: 0; right: 0; font-size: clamp(10px, 2.6vw, 13px); color: #26480a; opacity: .8; }
+  @keyframes wig { 0%,100% { transform: skewX(-5deg) scaleY(1); } 50% { transform: skewX(5deg) scaleY(1.07); } }
+  @keyframes blink { 50% { opacity: .35; } }
+  #hud { position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 6; padding: 6px 16px; font-size: clamp(13px, 3.4vw, 20px); display: none; white-space: nowrap; }
+  #hint { position: fixed; bottom: calc(26px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 6; padding: 8px 16px; font-size: clamp(12px, 3.2vw, 17px); display: none; white-space: nowrap; }
+  #steer { position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%; width: min(70vw, 300px); height: 16px; margin-left: calc(min(70vw, 300px) / -2); z-index: 6; display: none; border: 3px solid rgba(255,255,255,.7); border-radius: 10px; background: rgba(0,0,0,.25); }
+  #steer i { position: absolute; top: -9px; left: 50%; width: 30px; height: 30px; margin-left: -15px; border-radius: 50%; background: #9be04a; border: 3px solid #fff; }
+  #talk { position: fixed; left: 50%; bottom: 14vh; transform: translateX(-50%); width: min(92vw, 640px); z-index: 10; padding: 16px 20px 18px; display: none; font-size: clamp(16px, 4.6vw, 26px); line-height: 1.7; text-align: center; }
+  #talk .who { position: absolute; top: -17px; left: 18px; padding: 1px 12px; font-size: .7em; background: #1b3a07; border: 3px solid #fff; border-radius: 6px; }
+  #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 12; }
+  #end { z-index: 25; display: none; background: rgba(0,20,0,0); transition: background 1.5s; pointer-events: none; }
+  #end.show { background: rgba(0,20,0,.35); pointer-events: auto; }
+  #end .line { font-size: clamp(16px, 4.6vw, 28px); line-height: 2; opacity: 0; transition: opacity 1s; text-shadow: 0 2px 6px #000; }
+  #end .fin { font-size: clamp(44px, 14vw, 110px); letter-spacing: .15em; margin: 8px 0; text-shadow: 0 4px 0 #2d5a0a, 0 0 30px #d6ff7a; opacity: 0; transition: opacity 1.2s; }
+  #end .on { opacity: 1 !important; }
+  #end button { margin: 8px; font-family: var(--ui); font-size: clamp(16px, 4.4vw, 22px); color: #fff; padding: 10px 26px; cursor: pointer; opacity: 0; transition: opacity 1s; }
+</style>
+</head>
+<body>
+<div id="loading" class="overlay">
+  <div style="font-size:20px">ユウマムシ　よみこみちゅう…</div>
+  <div class="bar"><i id="bar"></i></div>
+  <div id="loadmsg" style="margin-top:14px;font-size:13px;opacity:.7"></div>
+</div>
+<div id="title" class="overlay">
+  <div class="logo">ユウマムシの<br>大冒険</div>
+  <div class="sub">いぬの ゆうしゃ イモムシに なる</div>
+  <div class="go win">▶ タップで はじめる</div>
+  <div class="how">ゆびを <b>よこに うごかして</b> ステアリング<br>（パソコンは ← → か A D）<br>ヒヨコを さがして すすもう　♪ おとが でます</div>
+  <div class="ver">PR#11</div>
+  <div class="copy">© 2026 ATCHI-YUMA PROJECT</div>
+</div>
+<div id="hud" class="win"></div>
+<div id="steer"><i></i></div>
+<div id="hint" class="win">ゆびを よこに うごかして ヒヨコへ！</div>
+<div id="talk" class="win"><div class="who"></div><div class="text"></div></div>
+<div id="flash"></div>
+<div id="end" class="overlay">
+  <div class="line" id="e1">ユウマは イモムシだった ことを</div>
+  <div class="line" id="e2">すっかり わすれて 犬に もどりましたとさ。</div>
+  <div class="fin" id="efin">おしまい</div>
+  <div class="line" id="e3" style="font-size:clamp(12px,3.4vw,18px)"></div>
+  <div>
+    <button id="again" class="win">もういちど</button>
+    <button id="home" class="win">ゲームしつへ</button>
+  </div>
+</div>
+<canvas id="c"></canvas>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.min.js", "three/addons/": "./lib/addons/" } }
+</script>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
