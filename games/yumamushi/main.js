@@ -5,9 +5,9 @@ import { MeshoptDecoder } from 'three/addons/meshopt_decoder.module.js';
 // ---------- 設定 ----------
 const Q = new URLSearchParams(location.search);
 const CHICK_DIST = Q.has('near') ? 4 : 22;   // ヒヨコまでの距離（?near で近く：動作確認用）
-const WAVE_SPEED = 5.2;                      // 這う波の速さ（rad/秒）
+const WAVE_SPEED = 5.0;                      // 這う波の速さ（rad/秒）
 const WAVE_JOINT = 0.9;                      // 隣の節との位相ずれ（README の見本と同じ）
-const WAVE_AMP = 0.2;                        // 上下の振れ（見本は 0.11。気持ち悪さ増しで大きめ）
+const WAVE_AMP = 0.11;                       // 上下の振れ（箱庭の見本と同じ）
 const FIELD_X = 9;
 
 const $ = (id) => document.getElementById(id);
@@ -339,22 +339,20 @@ $('title').addEventListener('click', () => { if (state === 'title') startGame();
 function animateCat(dt, moving, curl = 0) {
   phase += dt * WAVE_SPEED * (moving ? 1 : 0.7);
   const t = phase;
-  catParts.forEach((p, i) => {
-    // 這う波：後ろから前へ進む（見本と同じ。振れを大きく）
-    const up = WAVE_AMP * Math.sin(t + i * WAVE_JOINT) * (i === 0 ? 1.4 : 1);
-    // くねくね左右のゆらぎ
-    const wag = 0.16 * Math.sin(t * 0.5 + i * 0.7);
+  // 箱庭の見本ページと同じ動かし方：各節の「絶対の傾き」を波で決め、前の節との差を回転にする
+  let prev = 0;
+  catParts.slice(1).forEach((p, k) => {
+    const absA = WAVE_AMP * Math.sin(t + (k + 1) * WAVE_JOINT);
+    p.rotation.order = 'YXZ';
     // ハンドルを切ったほうへ体が曲がる
     const bend = steerSmooth * 0.14;
-    // 蛹になる前に体を丸める
-    p.rotation.set(up + curl * 0.42, wag * (1 - curl) + bend, 0);
+    p.rotation.set(absA - prev + curl * 0.42, bend, 0);
+    prev = absA;
   });
-  // ぐにょっと伸び縮み（ぜんたい）
   const lurch = Math.sin(t);
-  catWrap.scale.set(1 - lurch * 0.04, 1 + lurch * 0.07, 1 + lurch * 0.05);
-  // 頭のうねり
+  // 頭がぴょこぴょこ浮く（見本と同じ）
   const head = catParts[0];
-  if (head) head.rotation.z = 0.12 * Math.sin(t * 1.7);
+  if (head) head.position.y = Math.max(0, Math.sin(t) * 0.025);
   return Math.max(0, lurch);
 }
 
@@ -401,6 +399,28 @@ const hideSay = () => { $('talk').style.display = 'none'; };
 // ---------- 演出（蛹 → 犬） ----------
 const confetti = ['#ff6b8a', '#ffd23f', '#ffffff', '#7be0ff', '#b57bff', '#9be04a'];
 let flashA = 0;
+// 動画生成AIなどで作った「蛹→犬」の動画があれば、3D演出のかわりに流す（media/hanka.mp4 を置くだけ）
+let hankaVideo = false;
+fetch('./media/hanka.mp4', { method: 'HEAD' }).then((r) => { hankaVideo = r.ok; }).catch(() => {});
+function playHankaVideo() {
+  const v = document.createElement('video');
+  v.src = './media/hanka.mp4'; v.playsInline = true; v.setAttribute('playsinline', '');
+  v.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:14';
+  document.body.appendChild(v);
+  const done = () => { v.remove(); toDog(); };
+  v.onended = done; v.onerror = done;
+  v.play().catch(done);
+}
+function toDog() {
+  setState('burst'); flashA = 1; fanfare();
+  cat.visible = false; pupa.visible = false; pupaGlow.intensity = 0;
+  dog.visible = true;
+  dog.position.set(catPos.x, 0, catPos.z);
+  dog.rotation.y = heading.v + Math.PI;
+  dog.scale.setScalar(0.01);
+  if (dog.userData.wave) dog.userData.wave.reset().play();
+  burst.emit(new THREE.Vector3(catPos.x, 0.8, catPos.z), 200, 5, confetti, 5);
+}
 
 function startTalk() {
   setState('talk');
@@ -425,7 +445,7 @@ function updateScene(dt) {
     // 這う：波にあわせて「ぐいっ」と進む
     const lurch = animateCat(dt, true);
     moving = true;
-    const spd = 0.45 + 1.5 * lurch;
+    const spd = 0.9;                      // 見本と同じく、すべるように一定の速さ
     fwd.set(Math.sin(heading.v), 0, Math.cos(heading.v));
     catPos.addScaledVector(fwd, spd * dt);
     catPos.x = THREE.MathUtils.clamp(catPos.x, -FIELD_X, FIELD_X);
@@ -439,7 +459,11 @@ function updateScene(dt) {
   } else if (state === 'talk') {
     animateCat(dt, false);
     updateChick(dt, t);
-    if (t > 3.2) { hideSay(); setState('curl'); sfxSquelch(); }
+    if (t > 3.2) {
+      hideSay();
+      if (hankaVideo) { setState('video'); playHankaVideo(); }
+      else { setState('curl'); sfxSquelch(); }
+    }
   } else if (state === 'curl') {
     updateChick(dt, t);
     curl = Math.min(1, t / 2.2);
@@ -468,16 +492,7 @@ function updateScene(dt) {
     pupaGlow.position.set(catPos.x, 1, catPos.z); pupaGlow.intensity = glow * 14;
     if (t > 1.2) hideSay();
     if (t > 1.4 && Math.random() < dt * 30 * glow) burst.emit(new THREE.Vector3(catPos.x, 0.6, catPos.z), 2, 0.8, ['#fff6b0', '#ffffff'], 2);
-    if (t > 3.8) {
-      setState('burst'); flashA = 1; fanfare();
-      pupa.visible = false; pupaGlow.intensity = 0;
-      dog.visible = true;
-      dog.position.set(catPos.x, 0, catPos.z);
-      dog.rotation.y = heading.v + Math.PI;
-      dog.scale.setScalar(0.01);
-      if (dog.userData.wave) dog.userData.wave.reset().play();
-      burst.emit(new THREE.Vector3(catPos.x, 0.8, catPos.z), 200, 5, confetti, 5);
-    }
+    if (t > 3.8) toDog();
   } else if (state === 'burst' || state === 'dog') {
     updateChick(dt, t);
     const grow = Math.min(1, t / 0.5);
