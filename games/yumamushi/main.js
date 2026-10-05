@@ -163,7 +163,7 @@ function buildWorld() {
 
 // かわいい影
 function blob(r) {
-  const m = new THREE.Mesh(new THREE.CircleGeometry(r, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.25, depthWrite: false }));
+  const m = new THREE.Mesh(new THREE.CircleGeometry(r, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.14, depthWrite: false }));
   m.position.y = 0.03; return m;
 }
 
@@ -271,7 +271,7 @@ async function init() {
   catWrap = new THREE.Group(); catWrap.add(root);
   root.position.set(0, 0, -0.45);                 // 体の中ほどが足元の中心に来るようにずらす
   root.traverse((o) => { if (o.isMesh) { o.material.side = THREE.DoubleSide; } });
-  cat = new THREE.Group(); cat.add(catWrap); cat.add(blob(0.7));
+  cat = new THREE.Group(); cat.add(catWrap); cat.add(blob(0.5));
   scene.add(cat);
 
   // 犬（ユウマ）
@@ -353,8 +353,13 @@ function animateCat(dt, moving, curl = 0) {
   // 頭がぴょこぴょこ浮く（見本と同じ）
   const head = catParts[0];
   if (head) head.position.y = Math.max(0, Math.sin(t) * 0.025);
+  // 波で下に曲がった節が地面にめりこまないよう、いちばん低い所が地面に乗る高さに持ち上げる
+  catWrap.position.y = 0; cat.updateMatrixWorld(true);
+  groundBox.setFromObject(catWrap);
+  catWrap.position.y = Math.max(0, cat.position.y - groundBox.min.y) + 0.015;
   return Math.max(0, lurch);
 }
+const groundBox = new THREE.Box3();
 
 // ---------- ヒヨコの動き ----------
 function updateChick(dt, t) {
