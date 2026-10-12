@@ -15,6 +15,7 @@ const KING_POS = new THREE.Vector3(0, 3.7, -24);
 const YUMA_START = new THREE.Vector3(0, 3.7, 8);
 const YUMA_MEET = new THREE.Vector3(0, 3.7, -17.5);
 const SNACK_POS = new THREE.Vector3(0, 0.7, 69);
+const MEAT_POS = new THREE.Vector3(-8.5, 0.7, 66);      // 進行方向の右（-X）のおくに おいてある お肉
 const BRIDGE_Y = 0.9;
 const RAMP_Z0 = 36, RAMP_Z1 = 48, BRIDGE_END = 59;
 
@@ -116,7 +117,7 @@ function makeChar(gltf, height) {
 }
 
 // ---------------------------------------------------------------- 状態
-let yuma, king, stage, snack, crumbs, confetti, poodle, pome, butler, castle;
+let yuma, king, stage, snack, meat, crumbs, confetti, poodle, pome, butler, castle;
 const trail = [];
 let following = false;
 let heroGear = null;                 // ユウマの装備（着替え演出まで非表示）
@@ -174,8 +175,8 @@ function advance() {
   if (dlgResolve) dlgResolve();
 }
 function hideDialog() { dlg.style.display = 'none'; }
-async function talk(lines) {
-  for (const [who, text] of lines) await say(who, text);
+async function talk(lines, camFn) {
+  for (const [who, text] of lines) { if (camFn) camFn(who); await say(who, text); }
   hideDialog();
 }
 dlg.addEventListener('pointerdown', (e) => { e.stopPropagation(); advance(); });
@@ -197,8 +198,7 @@ function objective(text) {
 const fmt = (ms) => { const t = Math.max(0, ms) / 1000; const m = Math.floor(t / 60); return `${m}:${(t % 60).toFixed(2).padStart(5, '0')}`; };
 function readBest() { try { const v = parseFloat(localStorage.getItem(BEST_KEY)); return Number.isFinite(v) ? v : null; } catch { return null; } }
 function writeBest(ms) { try { localStorage.setItem(BEST_KEY, String(ms)); } catch { /* ブラウザが保存を許さない */ } }
-function showTimer() { $('timer').style.display = 'block'; }
-function startRun() { runStart = performance.now(); running = true; showTimer(); }
+function startRun() { runStart = performance.now(); running = true; }   // 画面には出さない。エンディングでだけ発表
 function stopRun() {
   if (!running) return null;
   running = false; runEnd = performance.now();
@@ -207,21 +207,21 @@ function stopRun() {
   if (record) writeBest(ms);
   return { ms, record, best: record ? ms : best };
 }
-function updateTimerHud() {
-  if (!running) return;
-  const best = readBest();
-  $('timer').textContent = `TIME ${fmt(performance.now() - runStart)}` + (best != null ? `　BEST ${fmt(best)}` : '');
-}
-const arrowEl = $('arrow'), hintEl = $('talkhint');
+const arrowEl = $('arrow'), hintEl = $('talkhint'), arrowGlyph = arrowEl.firstElementChild, arrowV = new THREE.Vector3();
+// ゴールの方角を示す矢印。ユウマの頭の上にただよう
 function updateArrow() {
   if (state !== 'play') { arrowEl.style.display = 'none'; return; }
   const p = yuma.group.position;
   const dx = GOAL.x - p.x, dz = GOAL.z - p.z;
   const f = dx * Math.sin(camYaw) + dz * Math.cos(camYaw);
   const r = dx * -Math.cos(camYaw) + dz * Math.sin(camYaw);
-  arrowEl.style.display = 'flex';
-  arrowEl.firstElementChild.style.transform = `rotate(${Math.atan2(r, f)}rad)`;
-  arrowEl.lastElementChild.textContent = `ゴールまで ${Math.max(0, Math.round(Math.hypot(dx, dz)))}m`;
+  camera.updateMatrixWorld();
+  arrowV.set(p.x, p.y + yuma.height + 0.6, p.z).project(camera);
+  if (arrowV.z > 1) { arrowEl.style.display = 'none'; return; }
+  arrowEl.style.display = 'block';
+  arrowEl.style.left = `${(arrowV.x * 0.5 + 0.5) * innerWidth}px`;
+  arrowEl.style.top = `${(-arrowV.y * 0.5 + 0.5) * innerHeight}px`;
+  arrowGlyph.style.transform = `rotate(${Math.atan2(r, f)}rad)`;
 }
 // ---- 村人に話しかける
 function findNpc() {
@@ -374,6 +374,30 @@ function buildProps() {
   snack.scale.setScalar(0.001);
   snack.visible = false;
   scene.add(snack);
+  // お肉（マンガ肉）：ひかりの柱とは別に、右がわのおくに おいてある
+  meat = new THREE.Group();
+  const fleshM = new THREE.MeshStandardMaterial({ color: 0xb5461e, roughness: 0.55, emissive: 0x3a1000 });
+  const glazeM = new THREE.MeshStandardMaterial({ color: 0xd9722a, roughness: 0.3, emissive: 0x4a1c00 });
+  const boneM = new THREE.MeshStandardMaterial({ color: 0xf6efdc, roughness: 0.6 });
+  const mbody = new THREE.Mesh(new THREE.SphereGeometry(0.8, 24, 18), fleshM);
+  mbody.scale.set(1.15, 0.95, 0.95);
+  const mglaze = new THREE.Mesh(new THREE.SphereGeometry(0.58, 20, 14), glazeM);
+  mglaze.position.set(-0.15, 0.3, 0.45);
+  const mbone = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 1.5, 12), boneM);
+  mbone.rotation.z = Math.PI / 2; mbone.position.x = 1.35;
+  meat.add(mbody, mglaze, mbone);
+  for (const sz of [-1, 1]) {
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), boneM);
+    knob.position.set(2.05, 0, sz * 0.14);
+    meat.add(knob);
+  }
+  meat.position.copy(MEAT_POS).add(new THREE.Vector3(0, 0.4, 0));
+  meat.rotation.z = -0.35;
+  scene.add(meat);
+  const meatBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 30, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0xff9060, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+  meatBeam.position.set(MEAT_POS.x, 15.7, MEAT_POS.z);
+  meatBeam.name = 'meatbeam';
+  scene.add(meatBeam);
   // かけら
   crumbs = [];
   // 紙ふぶき
@@ -449,6 +473,16 @@ function dressKing(ch) {
 function setCam(pos, look, snap = false) {
   camTarget.pos.copy(pos); camTarget.look.copy(look);
   if (snap) camSnap = true;
+}
+// キャラ（1〜2体）がちょうど収まる位置にカメラを置く。dir は注目点からカメラへ向かう水平方向
+function frameChars(chars, dir, { minD = 3.2, pad = 1.9, up = 0.15, lift = 1.5 } = {}) {
+  const a = chars[0].group.position, b = chars[chars.length - 1].group.position;
+  const sep = Math.hypot(a.x - b.x, a.z - b.z);
+  const mid = new THREE.Vector3((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+  const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect);
+  const d = Math.max(minD, (sep / 2 + pad) / Math.tan(hfov / 2));
+  const l = Math.hypot(dir.x, dir.z);
+  setCam(new THREE.Vector3(mid.x + dir.x / l * d, mid.y + up + lift, mid.z + dir.z / l * d), new THREE.Vector3(mid.x, mid.y + up, mid.z));
 }
 function updateCamera(dt) {
   if (orbit) {
@@ -561,6 +595,11 @@ function updateFx(dt, time) {
     beam.visible = state === 'play';
     beam.material.opacity = 0.18 + Math.sin(time * 3) * 0.06;
   }
+  const mb = scene.getObjectByName('meatbeam');
+  if (mb) {
+    mb.visible = state === 'play' || state === 'cut2' && meat.visible;
+    mb.material.opacity = 0.2 + Math.sin(time * 4) * 0.07;
+  }
   scene.traverse((o) => { if (o.name === 'flame') { o.scale.y = 1 + Math.sin(time * 14 + o.parent.position.x) * 0.2; } });
 }
 
@@ -626,7 +665,7 @@ async function intro() {
   yuma.group.position.copy(YUMA_START);
   yuma.group.rotation.y = Math.PI;
   setCam(new THREE.Vector3(5, 5.2, YUMA_START.z + 9), new THREE.Vector3(0, 5, -4), true);
-  yuma.play('walk', 0.1, 1.15);
+  yuma.play('walk', 0.1, 0.85);
   king.play('idle');
   // 玉座の前へ歩いていく
   await new Promise((res) => {
@@ -635,7 +674,7 @@ async function intro() {
       if (state !== 'cut1') return res();
       const now = performance.now(), dt = Math.min((now - last) / 1000, 0.05);
       last = now;
-      walkTo(yuma, YUMA_MEET, 6.5, dt, 0.05);
+      walkTo(yuma, YUMA_MEET, 3.8, dt, 0.05);
       const p = yuma.group.position;
       setCam(new THREE.Vector3(6, p.y + 2.6, p.z + 6), new THREE.Vector3(0, p.y + 1.2, p.z - 6));
       if (p.z <= YUMA_MEET.z + 0.1) return res();
@@ -645,8 +684,12 @@ async function intro() {
   });
   yuma.play('idle');
   await wait(300);
-  const meetCam = () => setCam(new THREE.Vector3(4.4, 5.5, -10), new THREE.Vector3(0.2, 4.9, -21));
-  meetCam();
+  // しゃべっている人に合わせたカメラ：王様とユウマはふたり一緒に、ぽんねこはアップ、犬たちはふたり一緒に
+  const kingCam = () => frameChars([yuma, king], { x: 1, z: 0.1 }, { pad: 1.2 });
+  const butlerCam = () => frameChars([butler], { x: 0.35, z: 1 }, { minD: 2.9, up: 0.25, lift: 1.1 });
+  const dogsCam = () => frameChars([poodle, pome], { x: 0, z: -1 }, { pad: 2.6 });
+  const camFor = (who) => { if (who === 'ぽんねこ') butlerCam(); else if (who === 'プードル' || who === 'ポメ') dogsCam(); else if (who) kingCam(); };
+  kingCam();
   king.play('wave', 0.2);
   await talk([
     ['王様', 'おお ゆうしゃ ユウマよ！ よくぞ きてくれた！'],
@@ -657,16 +700,16 @@ async function intro() {
     ['王様', 'ところで ユウマよ…… その かっこうは、 ちょっと さんぽ すぎる のう。'],
     ['王様', 'ゆうしゃには ゆうしゃの そうびが ひつようじゃ。 ぽんねこ、 あれを これへ！'],
     ['ぽんねこ', 'かしこまりました にゃ。'],
-  ]);
+  ], camFor);
   king.play('idle', 0.4);
   await equipCeremony();
-  meetCam();
+  kingCam();
   king.play('wave', 0.2);
   await talk([
     ['ユウマ', 'ワン！ …… どう？ にあう？'],
     ['王様', 'うむ！ どこから どう みても ゆうしゃじゃ！ …… ただし ひとりでは しんぱいじゃ。'],
     ['王様', 'なかまを しょうかいしよう！ …… これ、 はいりなさい！'],
-  ]);
+  ], camFor);
   king.play('idle', 0.4);
   // 仲間のかけつけ
   poodle.group.visible = pome.group.visible = true;
@@ -674,25 +717,25 @@ async function intro() {
   pome.group.position.set(2.1, 3.7, 14);
   poodle.group.rotation.y = pome.group.rotation.y = Math.PI;
   const camFollow = () => setCam(new THREE.Vector3(5.5, 5.2, poodle.group.position.z + 8), new THREE.Vector3(0, 4.9, poodle.group.position.z - 5));
-  await Promise.all([
-    moveChar(poodle, new THREE.Vector3(-2.1, 3.7, -17.5), 7, camFollow),
-    moveChar(pome, new THREE.Vector3(2.1, 3.7, -17.5), 7),
+  await Promise.all([                              // 時間をかけず、ダッシュでユウマのもとへ
+    moveChar(poodle, new THREE.Vector3(-2.1, 3.7, -17.5), 22, camFollow, 2.4),
+    moveChar(pome, new THREE.Vector3(2.1, 3.7, -17.5), 22, null, 2.4),
   ]);
   for (const c of [poodle, pome]) c.group.rotation.y = Math.PI;
-  meetCam();
+  dogsCam();
   poodle.play('wave', 0.2);
   await talk([
     ['プードル', 'あそびにんの プードルですわ。 …… さいころで ぜんぶ きめますの。'],
     ['プードル', 'たたかいの さいちゅうに あそぶ ことも ありますわ。 ごあんしんなさって？'],
-  ]);
+  ], camFor);
   poodle.play('idle', 0.3); pome.play('wave', 0.2);
   await talk([
     ['ポメ', 'そうりょの ポメです！ けがは ぼくが なおすよ！'],
     ['ポメ', 'ほんとうは おいのり するだけ だけど、 きもちは こもってるよ！'],
-  ]);
+  ], camFor);
   pome.play('idle', 0.3);
   music.found();
-  await talk([['', 'あそびにんの プードルと、 そうりょの ポメが なかまに くわわった！']]);
+  await talk([['', 'あそびにんの プードルと、 そうりょの ポメが なかまに くわわった！']], dogsCam);
   // 縦ならび（ドラクエ2）で ついてくる準備
   trail.length = 0;
   for (let i = 0; i < 40; i++) trail.push(new THREE.Vector3(YUMA_MEET.x, 3.7, YUMA_MEET.z - 0.3 * (i + 1)));
@@ -702,16 +745,16 @@ async function intro() {
   await talk([
     ['王様', 'ところで ここは すんぷじょうの あと。 いまは てんしゅが ないのが なやみ なのじゃ…。'],
     ['王様', 'そこで！ ゆうしゃの たびだちを いわって、 この しろを レベルアップ させるぞ！！'],
-  ]);
+  ], camFor);
   await castleShow();
 
-  setCam(new THREE.Vector3(4.4, 5.5, -10), new THREE.Vector3(0.2, 4.9, -21), true);
+  kingCam(); camSnap = true;
   king.play('wave', 0.2);
   await talk([
     ['王様', 'うむ！ これで あんしんじゃ！ ゆうしゃ ユウマと なかまたちよ、 しろを でて 魔王の しろを めざせ！ たのんだぞ！'],
-  ]);
+  ], camFor);
   music.bark();
-  await talk([['ユウマ', 'ワンッ！ まかせて！']]);
+  await talk([['ユウマ', 'ワンッ！ まかせて！']], camFor);
   king.play('idle', 0.4);
   beginPlay();
 }
@@ -722,7 +765,7 @@ function beginPlay() {
   state = 'play';
   document.body.classList.add('playing');
   startRun();
-  subtitle('タイムアタック スタート！　むらびとと おしゃべりすると タイムが のびるぞ', 4200);
+  subtitle('矢印の ほうへ すすもう！　むらびとにも はなしかけられるぞ', 4200);
 }
 
 async function countdown() {
@@ -735,14 +778,14 @@ async function countdown() {
   c.style.display = 'none';
 }
 
-function moveChar(ch, target, speed = 6.5, camFn) {
+function moveChar(ch, target, speed = 6.5, camFn, animSpeed = 1.3) {
   return new Promise((res) => {
     let last = performance.now();
     const tick = () => {
       const now = performance.now(), dt = Math.min((now - last) / 1000, 0.05);
       last = now;
       const done = walkTo(ch, target, speed, dt, 0.05);
-      ch.play(done ? 'idle' : 'walk', 0.15, 1.3);
+      ch.play(done ? 'idle' : 'walk', 0.15, animSpeed);
       if (camFn) camFn();
       if (done) return res();
       requestAnimationFrame(tick);
@@ -801,69 +844,106 @@ function followerUpdate(ch, gap, dt) {
   if (g != null) p.y += (g - p.y) * (1 - Math.exp(-dt * 15));
 }
 
-let kingCheered = false, hintShown = false;
-async function snackScene() {
+// 食べものの設定：ほねガム（ひかりの先）と お肉（階段のとちゅうで見つける）
+const BONE = () => ({ obj: snack, pos: SNACK_POS, base: 1.3, placed: false, msg: 'ユウマは ほねガムを ぺろりと たいらげた！' });
+const MEAT = () => ({ obj: meat, pos: MEAT_POS, base: 1.0, placed: true, msg: 'ユウマは お肉を ぺろりと たいらげた！' });
+let kingCheered = false;
+// お肉を見つけて、ユウマが制御不能になる
+async function meatEvent() {
+  state = 'cut2';
+  hintEl.style.display = 'none';
+  document.body.classList.remove('playing');
+  objective('');
+  yuma.play('idle', 0.15);
+  music.pirori();
+  const p = yuma.group.position;
+  setCam(new THREE.Vector3(p.x + 1.6, p.y + 1.7, p.z + 2.8), new THREE.Vector3(p.x, p.y + 1.2, p.z));
+  burstSparkles(new THREE.Vector3(p.x, p.y + 2.0, p.z), 16);
+  faceTo(yuma, MEAT_POS.x - p.x, MEAT_POS.z - p.z, 1, 100);
+  await wait(900);
+  await talk([['', 'ユウマは お肉を 見つけた。　制御不能となった！']]);
+  music.bark();
+  // かってに お肉のほうへ（橋をわたって）
+  const route = [new THREE.Vector3(0, 0.9, 54), new THREE.Vector3(0, 0.7, 61), new THREE.Vector3(MEAT_POS.x, MEAT_POS.y, MEAT_POS.z - 1.9)];
+  yuma.play('walk', 0.1, 1.9);
+  for (const wp of route) {
+    await new Promise((res) => {
+      let last = performance.now();
+      const tick = () => {
+        const now = performance.now(), dt = Math.min((now - last) / 1000, 0.05);
+        last = now;
+        const done = walkTo(yuma, wp, 8, dt, 0.1);
+        const q = yuma.group.position;
+        setCam(new THREE.Vector3(q.x + 3.4, q.y + 2.2, q.z - 4.2), new THREE.Vector3(q.x, q.y + 1.0, q.z + 3));
+        if (done) return res();
+        requestAnimationFrame(tick);
+      };
+      tick();
+    });
+  }
+  await snackScene(MEAT());
+}
+async function snackScene(T = BONE()) {
   state = 'cut2';
   hintEl.style.display = 'none';
   result = stopRun();
-  if (result) $('timer').textContent = `TIME ${fmt(result.ms)}`;
   document.body.classList.remove('playing');
   objective('');
   music.found();
   music.play('snack');
   yuma.play('idle', 0.15);
-  const p = yuma.group.position;
-  faceTo(yuma, 0, 1, 1, 100);
-  snack.visible = true;
-  burstSparkles(snack.position, 30);
-  // ぽんっと現れる
-  const t0 = performance.now();
-  await new Promise((res) => {
-    const tick = () => {
-      const t = clamp((performance.now() - t0) / 500, 0, 1);
-      snack.scale.setScalar(1.3 * (1 - Math.pow(1 - t, 3)) * (1 + Math.sin(t * Math.PI) * 0.25));
-      if (t >= 1) return res();
-      requestAnimationFrame(tick);
-    };
-    tick();
-  });
-  setCam(new THREE.Vector3(p.x + 2.8, p.y + 1.5, p.z + 3.2), new THREE.Vector3(0, p.y + 1.2, p.z + 6));
-  await talk([['', '！！！　ユウマの はなが ぴくぴく うごいた。'], ['ユウマ', 'くんくん…… この においは…… オヤツだーっ！！']]);
-  // かけよる
-  yuma.play('walk', 0.1, 1.9);
-  const goal = new THREE.Vector3(SNACK_POS.x, SNACK_POS.y, SNACK_POS.z - 1.9);
-  await new Promise((res) => {
-    const prev = camTarget.pos.clone();
-    const tick = (now) => {
-      const dt = 1 / 60;
-      const done = walkTo(yuma, goal, 7.5, dt, 0.05);
-      const q = yuma.group.position;
-      setCam(new THREE.Vector3(q.x + 3.2, q.y + 1.6, q.z - 1.0), new THREE.Vector3(snack.position.x, q.y + 0.9, snack.position.z - 0.6));
-      if (done) return res();
-      requestAnimationFrame(tick);
-    };
-    tick();
-  });
+  const p = yuma.group.position, SP = T.pos, so = T.obj;
+  so.visible = true;
+  if (!T.placed) {
+    faceTo(yuma, 0, 1, 1, 100);
+    burstSparkles(so.position, 30);
+    // ぽんっと現れる
+    const t0 = performance.now();
+    await new Promise((res) => {
+      const tick = () => {
+        const t = clamp((performance.now() - t0) / 500, 0, 1);
+        so.scale.setScalar(T.base * (1 - Math.pow(1 - t, 3)) * (1 + Math.sin(t * Math.PI) * 0.25));
+        if (t >= 1) return res();
+        requestAnimationFrame(tick);
+      };
+      tick();
+    });
+    setCam(new THREE.Vector3(p.x + 2.8, p.y + 1.5, p.z + 3.2), new THREE.Vector3(0, p.y + 1.2, p.z + 6));
+    await talk([['', '！！！　ユウマの はなが ぴくぴく うごいた。'], ['ユウマ', 'くんくん…… この においは…… オヤツだーっ！！']]);
+    // かけよる
+    yuma.play('walk', 0.1, 1.9);
+    const goal = new THREE.Vector3(SP.x, SP.y, SP.z - 1.9);
+    await new Promise((res) => {
+      const tick = () => {
+        const done = walkTo(yuma, goal, 7.5, 1 / 60, 0.05);
+        const q = yuma.group.position;
+        setCam(new THREE.Vector3(q.x + 3.2, q.y + 1.6, q.z - 1.0), new THREE.Vector3(so.position.x, q.y + 0.9, so.position.z - 0.6));
+        if (done) return res();
+        requestAnimationFrame(tick);
+      };
+      tick();
+    });
+  }
   yuma.play('idle', 0.2);
   yuma.group.rotation.y = 0;
   // むさぼり食う
   eating = true;
-  setCam(new THREE.Vector3(SNACK_POS.x + 3.4, 1.7, SNACK_POS.z - 1.6), new THREE.Vector3(SNACK_POS.x, 1.0, SNACK_POS.z - 0.6));
+  setCam(new THREE.Vector3(SP.x + 3.4, 1.7, SP.z - 1.6), new THREE.Vector3(SP.x, 1.0, SP.z - 0.6));
   await wait(500);
   const bites = 7;
   for (let i = 0; i < bites; i++) {
     music.munch();
-    burstCrumbs(new THREE.Vector3(SNACK_POS.x, 1.3, SNACK_POS.z - 1.1));
-    snack.scale.setScalar(1.3 * (1 - (i + 1) / (bites + 0.2)));
-    snack.position.z = SNACK_POS.z - 0.1 * i;
+    burstCrumbs(new THREE.Vector3(SP.x, 1.3, SP.z - 1.1));
+    so.scale.setScalar(T.base * (1 - (i + 1) / (bites + 0.2)));
+    so.position.z = SP.z - 0.1 * i;
     await wait(330);
   }
-  snack.visible = false;
-  burstSparkles(new THREE.Vector3(SNACK_POS.x, 1.4, SNACK_POS.z - 1.0), 18);
+  so.visible = false;
+  burstSparkles(new THREE.Vector3(SP.x, 1.4, SP.z - 1.0), 18);
   eating = false;
   await talk([
     ['ユウマ', 'もぐ もぐ もぐ…… うまーーーい！！'],
-    ['', 'ユウマは ほねガムを ぺろりと たいらげた！'],
+    ['', T.msg],
     ['ユウマ', 'ん？ ぼく なにか たいせつな ことを たのまれて いたような……'],
     ['ユウマ', '…… まあ いっか！ オヤツ おいしかったし！'],
   ]);
@@ -872,7 +952,6 @@ async function snackScene() {
 
 async function ending() {
   state = 'ending';
-  $('timer').style.display = 'none';
   $('lv').style.display = 'none';
   objective('');
   music.play('ending');
@@ -894,14 +973,13 @@ async function ending() {
   await wait(3400);
   $('efin').classList.add('on');
   $('e3').innerHTML = result
-    ? `タイム　<b>${fmt(result.ms)}</b>　${result.record ? '★ しんきろく！ ★' : `ベスト ${fmt(result.best)}`}`
+    ? `…… えっ？ じつは これ、 タイムアタック だったのです。<br>タイム　<b>${fmt(result.ms)}</b>　${result.record ? '★ しんきろく！ ★' : `ベスト ${fmt(result.best)}`}`
     : '';
   $('e3').classList.add('on');
   await wait(1200);
   $('again').classList.add('on');
 }
-$('again').addEventListener('click', () => { location.search = '?mode=ta'; });
-$('again2').addEventListener('click', () => { location.search = ''; });
+$('again').addEventListener('click', () => { location.search = ''; });
 
 // ---------------------------------------------------------------- メインループ
 const clock = new THREE.Clock();
@@ -913,8 +991,8 @@ function frame() {
       playerUpdate(dt);
       const p = yuma.group.position;
       if (!kingCheered && p.z > 4) { kingCheered = true; subtitle('王様「ゆけ ユウマよ！ たのんだぞーっ！」'); king.play('wave', 0.3); }
-      if (!hintShown && p.z > RAMP_Z0 + 4) { hintShown = true; subtitle('…… なんだか いい においが する！？', 3500); }
-      if (p.z >= SNACK_POS.z - 8 && groundAt(p.x, p.z) != null && p.z > BRIDGE_END + 1.5) snackScene();
+      if (p.z > RAMP_Z0 + 4) meatEvent();       // 階段をおりる とちゅうで お肉を見つける
+      else if (p.z >= SNACK_POS.z - 8 && groundAt(p.x, p.z) != null && p.z > BRIDGE_END + 1.5) snackScene();
     }
     if (following) {
       updateTrail();
@@ -926,8 +1004,6 @@ function frame() {
     nearNpc = findNpc();
     if (nearNpc) { hintEl.style.display = 'block'; hintEl.textContent = `💬 ${nearNpc.name} に はなしかける（スペース / タップ）`; }
     else hintEl.style.display = 'none';
-    updateArrow();
-    updateTimerHud();
     castle.update(dt, time);
     if (eating) {
       eatBob += dt * 16;
@@ -940,7 +1016,10 @@ function frame() {
     }
     snack.rotation.y += dt * 1.2;
     if (snack.visible && !eating) snack.position.y = 0.9 + Math.sin(time * 3) * 0.12 + SNACK_POS.y - 0.7;
+    meat.rotation.y += dt * 1.0;
+    if (meat.visible && !eating) meat.position.y = 1.1 + Math.sin(time * 2.6) * 0.1 + MEAT_POS.y - 0.7;
     updateCamera(dt);
+    updateArrow();
     updateFx(dt, time);
   } else if (stage) {
     camera.lookAt(0, 4, 0);
@@ -977,7 +1056,7 @@ function buildNpcs(ga, gb) {
     ] },
     { name: '兵士', src: ga, h: 1.75, pos: [3.6, -13], face: -Math.PI / 2, dress: dressGuard, lines: [
       ['さっき てんしゅが いきなり はえて きて、 ビックリ しました。', 'ここの しゃちほこ、 ドッグフードに みえて きて こまります。'],
-      ['…… ユウマどの。 おしゃべりを する たびに タイムが のびて おりますぞ。'],
+      ['…… ユウマどの。 おしゃべりも よいですが、 みちくさには ごようじん を。'],
     ] },
     { name: 'ぽんねこの いとこ', src: gb, h: 1.6, pos: [-3.4, 3], face: Math.PI / 2, dress: dressMerchant, lines: [
       ['いらっしゃい にゃ！ ぼくは ぽんねこの いとこ。 ぼうぐを うってる にゃ。', 'ゴールドが ない？ …… だったら なにも うれない にゃ。'],
@@ -985,7 +1064,7 @@ function buildNpcs(ga, gb) {
     ] },
     { name: 'おでんやの おじさん', src: ga, h: 1.7, pos: [3.4, 19], face: -Math.PI / 2, dress: dressOden, lines: [
       ['しずおかおでん、 くろはんぺん あるよ！ だしこが たっぷり かかるよ！', 'ゆうしゃの たびに おでんは ひつよう だ。 …… って、 いそがなくて いいのかい？'],
-      ['タイム、 はかってるんだろう？ おでんは かえりに よっていきな！'],
+      ['おでんは かえりに よっていきな！ からだが あったまるぞ！'],
     ] },
   ];
   for (const d of defs) {
@@ -1045,11 +1124,11 @@ async function boot() {
   $('loading').style.display = 'none';
   $('title').style.display = 'flex';
   state = 'title';
-  window.__game = { THREE, scene, camera, yuma, king, poodle, pome, butler, castle, castleShow, setCam, snackScene, ending, get state() { return state; }, groundAt, set camYaw(v) { camYaw = v; } };
+  window.__game = { snap() { camSnap = true; }, frameChars, THREE, scene, camera, yuma, king, poodle, pome, butler, castle, castleShow, setCam, snackScene, ending, get state() { return state; }, groundAt, set camYaw(v) { camYaw = v; } };
   // タイトル画面ではお城を見せる
   setCam(new THREE.Vector3(7, 6.2, -9), new THREE.Vector3(0, 4.8, -24), true);
   const items = [...document.querySelectorAll('#title .menu .item')];
-  let sel = DEBUG.get('mode') === 'ta' ? 1 : 0;
+  let sel = 0;
   const paint = () => items.forEach((el, i) => { el.firstElementChild.textContent = i === sel ? '▶' : ''; });
   paint();
   const startGame = (mode) => {
@@ -1067,7 +1146,6 @@ async function boot() {
   twinkle();
   addEventListener('keydown', (e) => {
     if (state !== 'title') return;
-    if (['ArrowUp', 'ArrowDown', 'KeyW', 'KeyS'].includes(e.code)) { sel = 1 - sel; paint(); music.blip(600); }
     if (['Space', 'Enter'].includes(e.code)) startGame(sel);
   });
   if (DEBUG.has('autostart')) startGame(DEBUG.get('autostart') === 'ta' ? 1 : 0);

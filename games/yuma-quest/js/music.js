@@ -266,6 +266,11 @@ export class Music {
     const t = this.ctx.currentTime;
     [72, 76, 79, 84, 88, 91].forEach((m, i) => this.pluck(this.sfxBus, t + i * 0.07, m, 0.6, 0.18, 'triangle'));
   }
+  pirori() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    [79, 83, 86, 91, 95, 98, 103, 98, 103, 107].forEach((m, i) => this.pluck(this.sfxBus, t + i * 0.06, m, 0.35, 0.16, 'square'));
+  }
   bark() {
     if (!this.ctx) return;
     const t = this.ctx.currentTime, g = this.ctx.createGain();
