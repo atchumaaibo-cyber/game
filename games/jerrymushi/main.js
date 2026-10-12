@@ -546,7 +546,7 @@ function showEnd() {
   setTimeout(() => $('e1').classList.add('on'), 400);
   setTimeout(() => $('e2').classList.add('on'), 1600);
   setTimeout(() => $('efin').classList.add('on'), 3000);
-  setTimeout(() => { $('e3').classList.add('on'); $('again').classList.add('on'); $('home').classList.add('on'); }, 4200);
+  setTimeout(() => { $('e3').classList.add('on'); $('yt').classList.add('on'); $('again').classList.add('on'); $('home').classList.add('on'); }, 4200);
   $('again').style.opacity = 0; $('home').style.opacity = 0;
   setTimeout(() => { $('again').style.opacity = 1; $('home').style.opacity = 1; }, 4200);
 }
@@ -575,6 +575,11 @@ function updateCamera(dt) {
       look = headPt.lerp(look, e);
       camPos.copy(want); camLook.copy(look);
     }
+  } else if (state === 'burst' || state === 'dog') {
+    // ジェリーが手をふる：正面からうつす（ジェリーは来た道のほう＝-fwd を向いている）
+    const d = portrait ? 3.3 : 2.8;
+    want = catPos.clone().addScaledVector(fwd, -d); want.y = 0.75;
+    look = catPos.clone(); look.y = 0.55;
   } else {
     // 演出中：ジェリーと石板を横から見るカメラ
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
