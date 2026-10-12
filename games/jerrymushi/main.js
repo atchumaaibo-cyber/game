@@ -261,7 +261,7 @@ async function init() {
   buildWorld();
   burst = new Burst(300);
   $('loadmsg').textContent = 'イモムシを よんでいます…';
-  const [im, yu] = await Promise.all([load('./models/jerry.glb'), load('./models/yuma.glb')]);
+  const [im, yu] = await Promise.all([load('./models/jerry.glb'), load('./models/jerry-end.glb')]);
 
   // イモムシ：GLB の節の親子（head → seg1 … seg6）をそのまま使い、回転だけで動かす
   const root = im.scene;
@@ -277,7 +277,7 @@ async function init() {
   cat = new THREE.Group(); cat.add(catWrap); cat.add(blob(0.5));
   scene.add(cat);
 
-  // 犬（ユウマ）
+  // ジェリー（もとの姿）
   const dogModel = yu.scene;
   dogModel.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) o.frustumCulled = false; });
   const dbox = new THREE.Box3().setFromObject(dogModel);
@@ -286,7 +286,7 @@ async function init() {
   dog = new THREE.Group(); dog.add(dogModel); dog.visible = false;
   scene.add(dog);
   dogMixer = new THREE.AnimationMixer(dogModel);
-  const clip = yu.animations.find((a) => a.name === 'wave') || yu.animations.find((a) => a.name === 'idle');
+  const clip = yu.animations.find((a) => a.name === 'wave_A') || yu.animations.find((a) => a.name === 'idle');
   if (clip) { dog.userData.wave = dogMixer.clipAction(clip); }
   const idle = yu.animations.find((a) => a.name === 'idle');
   if (idle) dog.userData.idle = dogMixer.clipAction(idle);
@@ -517,7 +517,7 @@ function updateScene(dt) {
     dog.scale.setScalar(Math.max(0.01, s));
     if (state === 'burst' && t > 0.5) {
       setState('dog');
-      say('', 'ジェリーは 犬に もどった！');
+      say('', 'ジェリーに もどった！');
     } else if (state === 'dog') {
       if (t > 2.4) hideSay();
       if (t > 2.8 && !$('end').classList.contains('show')) showEnd();
