@@ -13,7 +13,7 @@ GitHub Pages: `https://atchumaaibo-cyber.github.io/game/games/jerrymushi/`
 
 ## 中身
 
-- `models/jerry.glb` … ジェリーイモムシ v1（仮：本物は `ジェリー/イモムシ/ジェリーイモムシ_v1.glb` のコピー）。GLB に動きは入っていないので、`main.js` の `animateCat` が節（head, seg1〜seg6）の回転を波で動かす（元の README の見本と同じ：後ろから前へ進む波、隣と0.9rad ずれ。振れは見本の0.11より大きめ）
+- `models/jerry.glb` … ジェリーイモムシ v1（`ジェリー/イモムシ/ジェリーイモムシ_v1.glb` のコピー）。GLB に動きは入っていないので、`main.js` の `animateCat` が節（head, seg1〜seg6）の回転を波で動かす（元の README の見本と同じ：後ろから前へ進む波、隣と0.9rad ずれ。振れは見本の0.11より大きめ）
 - `models/yuma.glb` … 犬のユウマ（`games/dog-fps/lite/yuma.glb` と同じ）。最後に出てきて手をふる
 - 光る石板・さなぎ・背景は、モデルがないのでコードで作った仮の姿
 - 蛹→犬に戻る「動画」は素材がなかったので、3D演出（糸のきらめき・ぶるぶる・発光・フラッシュ・紙吹雪・ティロリロリン）で代用
