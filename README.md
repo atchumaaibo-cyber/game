@@ -16,7 +16,6 @@
 
 - [ユウマクエスト](games/yuma-quest/README.md)（`games/yuma-quest/index.html`）
 - [犬FPS](games/dog-fps/README.md)（`games/dog-fps/index.html`）
-- 歌詞メーカー（`games/kashi-maker/index.html`）… 忘年会マジック用。トランプの色と数字を選ぶと歌詞カードが出て、2秒後に曲が流れる
 
 ## ブラウザで遊ぶ（GitHub Pages）
 
