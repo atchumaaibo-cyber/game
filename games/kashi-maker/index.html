@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+</head>
+<body>
+<title>歌詞メーカー</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* 1画面アプリ：色を選ぶ → ランクを選ぶ → 歌詞カード（曲は2秒後に再生） */
+  :root {
+    --paper: #fbf6ea;
+    --ink: #2b2622;
+    --muted: #8a8278;
+    --red: #c8323c;
+    --black: #26292e;
+    --bg: #f1ece2;
+    --tile: #ffffff;
+    --tile-edge: #d9d1c3;
+    --on-color: #ffffff;
+    --font-ui: "Yu Gothic UI", "Hiragino Maru Gothic ProN", "Meiryo", sans-serif;
+    --font-lyric: "BIZ UDGothic", "BIZ UDゴシック", "MS Gothic", "Osaka-Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #22201c; --ink: #f1ebe0; --muted: #a59d92; --red: #e2565f; --black: #4a4f58;
+      --bg: #171512; --tile: #2b2824; --tile-edge: #11100e; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #22201c; --ink: #f1ebe0; --muted: #a59d92; --red: #e2565f; --black: #4a4f58;
+    --bg: #171512; --tile: #2b2824; --tile-edge: #11100e; color-scheme: dark;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--font-ui);
+    -webkit-user-select: none; user-select: none; touch-action: manipulation; overflow: hidden;
+  }
+  .screen { position: fixed; inset: 0; display: none;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-top: calc(16px + env(safe-area-inset-top, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .screen.on { display: flex; }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--muted); outline-offset: 3px; }
+
+  #pickColor { flex-direction: column; gap: 16px; }
+  #pickColor p { color: var(--muted); font-size: 15px; text-align: center; }
+  #colors { flex: 1; display: flex; gap: 4vw; }
+  @media (max-width: 600px) { #colors { flex-direction: column; } }
+  #colors button { flex: 1; border: 0; border-radius: 4vmin; color: var(--on-color); font-weight: 700; font-size: 16vmin; line-height: 1; }
+  #btnRed { background: var(--red); }
+  #btnBlack { background: var(--black); }
+
+  #pickRank { flex-direction: column; gap: 3vmin; }
+  #pickRank .head { display: flex; align-items: center; gap: 3vmin; font-size: max(18px, 5vmin); font-weight: 700; }
+  #chosen { padding: .3em .9em; border-radius: 2vmin; color: var(--on-color); }
+  #back { margin-left: auto; font-size: max(15px, 4vmin); background: none; border: 0; color: var(--muted); }
+  #ranks { flex: 1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 2.5vmin; }
+  @media (max-width: 600px) { #ranks { grid-template-columns: repeat(4, 1fr); } }
+  #ranks button { border: 0; border-radius: 3vmin; background: var(--tile); color: var(--ink);
+    font-weight: 700; font-size: max(24px, 9vmin); line-height: 1; box-shadow: 0 .6vmin 0 var(--tile-edge); }
+  #ranks button:active { transform: translateY(.4vmin); box-shadow: 0 .2vmin 0 var(--tile-edge); }
+
+  #card { background: var(--paper); align-items: center; justify-content: center; }
+  #lyrics { font-family: var(--font-lyric); line-height: 1.55; font-weight: 700; white-space: pre; }
+  #lyrics .blank { height: .6em; }
+  #lyrics .hl { color: var(--red); }
+  #cardBar { position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; }
+  #cardBar button { font-size: 14px; padding: .45em .9em; border-radius: 999px; border: 1px solid var(--tile-edge); background: var(--tile); color: var(--muted); }
+</style>
+
+<section id="pickColor" class="screen on">
+  <div id="colors">
+    <button id="btnRed" data-color="赤">赤</button>
+    <button id="btnBlack" data-color="黒">黒</button>
+  </div>
+  <p>カードの色 → 数字を選ぶと、歌詞が出て 2 秒後に曲が流れます</p>
+</section>
+
+<section id="pickRank" class="screen">
+  <div class="head"><span id="chosen"></span><button id="back">← 色を選び直す</button></div>
+  <div id="ranks"></div>
+</section>
+
+<section id="card" class="screen">
+  <div id="cardBar">
+    <button id="btnPlay">一時停止</button>
+    <button id="btnClose">戻る</button>
+  </div>
+  <div id="lyrics"></div>
+</section>
+
+<audio id="song" src="song.mp3" preload="auto"></audio>
+
+<script src="lyrics.js"></script>
+<script>
+const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+const $ = id => document.getElementById(id);
+const song = $("song");
+const START_DELAY_MS = 2000;
+const RED_CHARS = "二三下";  // 歌詞カードで赤くする文字
+let color = null, startTimer = null;
+
+function show(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id));
+}
+
+document.querySelectorAll("#colors button").forEach(b => b.onclick = () => {
+  color = b.dataset.color;
+  $("chosen").textContent = color;
+  $("chosen").style.background = color === "赤" ? "var(--red)" : "var(--black)";
+  show("pickRank");
+});
+$("back").onclick = () => show("pickColor");
+
+RANKS.forEach(r => {
+  const b = document.createElement("button");
+  b.textContent = r;
+  b.onclick = () => openCard(color + r);
+  $("ranks").appendChild(b);
+});
+
+function openCard(key) {
+  const box = $("lyrics");
+  box.replaceChildren(...(window.LYRICS[key] || ["（歌詞データなし）"]).map(t => {
+    const d = document.createElement("div");
+    if (!t) { d.className = "blank"; return d; }
+    for (const ch of t) {
+      if (RED_CHARS.includes(ch)) {
+        const sp = document.createElement("span");
+        sp.className = "hl"; sp.textContent = ch; d.append(sp);
+      } else d.append(ch);
+    }
+    return d;
+  }));
+  show("card");
+  $("btnPlay").textContent = "一時停止";
+  // 全画面はできる端末だけ（スマホでは無視される）
+  try { document.documentElement.requestFullscreen?.().catch(() => {}); } catch (e) {}
+  // タップの瞬間に一度鳴らして止め、再生の許可を取っておく。2 秒後に頭から再生
+  song.currentTime = 0;
+  song.play().then(() => song.pause()).catch(() => {});
+  clearTimeout(startTimer);
+  startTimer = setTimeout(() => { song.currentTime = 0; song.play().catch(() => {}); }, START_DELAY_MS);
+  requestAnimationFrame(fit);
+  document.fonts.load('700 40px "BIZ UDGothic"').then(fit, fit);
+  document.fonts.ready.then(fit);
+}
+
+// 画面いっぱいに収まる最大の文字サイズを探す
+function fit() {
+  const box = $("lyrics");
+  const W = innerWidth * 0.92, H = (innerHeight - 56) * 0.92;
+  let lo = 8, hi = 400;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    box.style.fontSize = mid + "px";
+    (box.scrollWidth <= W && box.scrollHeight <= H) ? lo = mid : hi = mid;
+  }
+  box.style.fontSize = lo + "px";
+}
+addEventListener("resize", () => { if ($("card").classList.contains("on")) fit(); });
+
+$("btnPlay").onclick = () => {
+  clearTimeout(startTimer);
+  if (song.paused) { song.play().catch(() => {}); $("btnPlay").textContent = "一時停止"; }
+  else { song.pause(); $("btnPlay").textContent = "続きから再生"; }
+};
+
+function closeCard() {
+  if (!$("card").classList.contains("on")) return;
+  clearTimeout(startTimer);
+  song.pause();
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  show("pickColor");
+}
+$("btnClose").onclick = closeCard;
+$("card").addEventListener("dblclick", closeCard);
+addEventListener("keydown", e => { if (e.key === "Escape") closeCard(); });
+</script>
+
+</body>
+</html>
