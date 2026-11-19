@@ -17,6 +17,10 @@
 - [ユウマクエスト](games/yuma-quest/README.md)（`games/yuma-quest/index.html`）
 - [犬FPS](games/dog-fps/README.md)（`games/dog-fps/index.html`）
 
+## 道具
+
+- [パンデミック 2卓そろえ山札](games/pandemic/README.md)（`games/pandemic/index.html`）… ボードゲームを2卓で同じカード順で遊ぶためのスマホ用ページ
+
 ## ブラウザで遊ぶ（GitHub Pages）
 
 リポジトリの Settings → Pages で `main` ブランチ・`/(root)` を選ぶと、`https://atchumaaibo-cyber.github.io/game/` でトップページが開き、そこから2本のゲームを遊べる。ダウンロード不要。
