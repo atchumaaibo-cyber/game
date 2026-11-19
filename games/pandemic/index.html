@@ -252,8 +252,9 @@ function apply(st,a){
   }
 }
 function rebuild(){S=buildInitial(cfg);for(const a of actions)apply(S,a);}
-function act(a){actions.push(a);apply(S,a);save();render();}
-function undo(){if(!actions.length)return;actions.pop();rebuild();save();render();toast("1つ戻しました");}
+function act(a){actions.push(a);apply(S,a);save();render();syncAddr();}
+function syncAddr(){try{if(cfg)history.replaceState(null,"",setupLink(true));}catch(e){}}
+function undo(){if(!actions.length)return;actions.pop();rebuild();save();render();syncAddr();toast("1つ戻しました");}
 
 // 照合コード：今の山の並びから作る4文字。2卓で同じなら同じ順。
 function syncCode(){const s=S.playerDeck.map(c=>c.n).join("/")+"#"+S.infDeck.map(c=>c.n).join("/")+"#"+S.infDisc.map(c=>c.n).sort().join("/");
@@ -300,7 +301,9 @@ function renderPlay(){
     S.drawnThisTurn.forEach(c=>h+=drawnCard(c));
     const need=RATES[S.rateIdx];
     const got=S.log.filter(l=>l.turn===S.turn&&l.k==="inf").map(l=>l.card);
-    if(got.length)h+=`<h2>感染カード</h2>`;
+    const rose=S.log.some(l=>l.turn===S.turn&&l.k==="epi")&&S.rateIdx>0&&RATES[S.rateIdx]>RATES[S.rateIdx-1];
+    if(rose)h+=`<div class="warn" style="background:#4c0519;border-color:#e11d48;color:#fecdd3">感染率が上がりました：この手番から <b>${need}枚</b></div>`;
+    h+=`<h2>感染カード（${S.infThisTurn}/${S.quiet?0:need}枚）</h2>`;
     got.forEach(c=>h+=cardHTML(c,`<div class="to">${c.n} に病原体を1個置く</div>`,"i"));
     if(!S.quiet&&S.infThisTurn<need){
       h+=`<button class="big inf" onclick="act({t:'inf'})">感染カードを引く（${S.infThisTurn+1}/${need}）</button>`;
@@ -432,10 +435,10 @@ function startGame(){
   const c=readSetup();if(!c.seed){newSeed();c.seed=$("seed").value;}
   cfg=c;actions=[];rebuild();save();enterGame();
 }
-function enterGame(){$("setup").classList.add("hidden");$("game").classList.remove("hidden");$("tabs").classList.remove("hidden");setView("play");render();window.scrollTo(0,0);}
+function enterGame(){setTimeout(syncAddr,0);$("setup").classList.add("hidden");$("game").classList.remove("hidden");$("tabs").classList.remove("hidden");setView("play");render();window.scrollTo(0,0);}
 function resetGame(){if(!confirmInline())return;}
 function confirmInline(){openModal(`<h2 style="margin-top:0">ゲームをやめますか？</h2><div class="muted">進行は消えます（同じ合言葉で始め直せば同じ順から出ます）。</div><div class="row" style="margin-top:12px"><button onclick="closeModal()">続ける</button><button style="color:#fca5a5" onclick="closeModal();doReset()">やめる</button></div>`);return false;}
-function doReset(){try{localStorage.removeItem(LS);}catch(e){}cfg=null;actions=[];$("game").classList.add("hidden");$("tabs").classList.add("hidden");$("setup").classList.remove("hidden");}
+function doReset(){try{localStorage.removeItem(LS);history.replaceState(null,"",location.pathname);}catch(e){}cfg=null;actions=[];$("game").classList.add("hidden");$("tabs").classList.add("hidden");$("setup").classList.remove("hidden");}
 function setupLink(withProgress){const c=readSetupOrCfg();const u=new URL(location.href.split("?")[0].split("#")[0]);
   u.searchParams.set("s",c.seed);u.searchParams.set("p",c.players);u.searchParams.set("e",c.epi);
   if(c.events.join("\n")!==DEFAULT_EVENTS.join("\n"))u.searchParams.set("ev",c.events.join(","));
