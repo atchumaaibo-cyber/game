@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>2卓そろえ山札</title>
+<style>
+:root{
+  --bg:#0f1115;--panel:#181b22;--panel2:#20242d;--line:#2c313c;--txt:#eef0f4;--sub:#9aa3b2;
+  --blue:#3b82f6;--yellow:#eab308;--black:#6b7280;--red:#ef4444;--event:#10b981;--epi:#e11d48;--acc:#f59e0b;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif;font-size:16px}
+body{padding:12px 16px calc(90px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto}
+h1{font-size:20px;margin:6px 0 12px}
+h2{font-size:16px;margin:18px 0 8px;color:var(--sub);font-weight:600}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;color:var(--sub);font-size:13px;margin:10px 0 6px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1;min-width:52px}
+button{font:inherit;color:var(--txt);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 10px;cursor:pointer}
+button.on{background:var(--acc);color:#111;border-color:var(--acc);font-weight:700}
+button.big{width:100%;font-size:19px;font-weight:700;padding:18px;background:var(--acc);color:#111;border:none;border-radius:14px}
+button.big.inf{background:#7c3aed;color:#fff}
+button.big.next{background:#22c55e;color:#06210f}
+button.sm{padding:8px 10px;font-size:14px}
+button:disabled{opacity:.35}
+input,textarea{font:inherit;color:var(--txt);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;width:100%}
+textarea{min-height:70px;font-size:14px}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.muted{color:var(--sub);font-size:13px;line-height:1.6}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center}
+.stat b{display:block;font-size:20px}
+.stat span{font-size:11px;color:var(--sub)}
+.turn{font-size:15px;margin-bottom:10px}
+.turn b{font-size:22px;color:var(--acc)}
+.card{border-radius:14px;padding:16px;margin:8px 0;border:3px solid;background:var(--panel2);position:relative}
+.card .nm{font-size:28px;font-weight:800;letter-spacing:.02em}
+.card .kd{font-size:12px;color:var(--sub)}
+.card .to{margin-top:6px;font-size:15px}
+.card .to b{color:var(--acc)}
+.c-blue{border-color:var(--blue)}.c-blue .nm{color:#93c5fd}
+.c-yellow{border-color:var(--yellow)}.c-yellow .nm{color:#fde047}
+.c-black{border-color:var(--black)}.c-black .nm{color:#e5e7eb}
+.c-red{border-color:var(--red)}.c-red .nm{color:#fca5a5}
+.c-event{border-color:var(--event)}.c-event .nm{color:#6ee7b7}
+.c-epi{border-color:var(--epi);background:#3b0a14}.c-epi .nm{color:#fda4af}
+.ptag,.itag{display:inline-block;font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;margin-bottom:4px}
+.ptag{background:var(--acc);color:#111}
+.itag{background:#7c3aed;color:#fff}
+.card.icard{background:repeating-linear-gradient(135deg,#1c1530 0 12px,#211838 12px 24px);border-style:dashed}
+.card .chip{position:absolute;right:12px;top:12px;font-size:20px;font-weight:900;padding:4px 12px;border-radius:8px;color:#111}
+.chip-blue{background:var(--blue);color:#fff!important}.chip-yellow{background:var(--yellow)}.chip-black{background:#111;color:#fff!important;border:1px solid #888}.chip-red{background:var(--red);color:#fff!important}.chip-event{background:var(--event)}
+.track{display:flex;gap:4px;justify-content:center;margin:-4px 0 12px;font-size:13px;color:var(--sub);align-items:center}
+.track span{display:inline-block;min-width:26px;text-align:center;padding:3px 0;border-radius:6px;border:1px solid var(--line)}
+.track span.now{background:#7c3aed;color:#fff;border-color:#7c3aed;font-weight:800}
+.track span.past{opacity:.4}
+#qr{display:flex;justify-content:center;margin:10px 0}
+#qr img,#qr canvas{background:#fff;padding:8px;border-radius:8px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.d-blue{background:var(--blue)}.d-yellow{background:var(--yellow)}.d-black{background:#111;border:1px solid #888}.d-red{background:var(--red)}.d-event{background:var(--event)}.d-epi{background:var(--epi)}
+.cubes{display:inline-block;margin-left:8px;font-size:18px;letter-spacing:2px}
+.list{list-style:none;margin:0;padding:0}
+.list li{padding:9px 4px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;font-size:15px}
+.list li .t{color:var(--sub);font-size:12px;min-width:56px}
+.list li.epi{color:#fda4af;font-weight:700}
+.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0b0d11;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:10}
+.tabs button{flex:1;border:none;border-radius:0;background:none;padding:14px 4px;color:var(--sub);font-size:14px}
+.tabs button.on{color:var(--acc);background:none;font-weight:700}
+.code{font-family:ui-monospace,Menlo,monospace;font-size:22px;letter-spacing:.15em;font-weight:800;color:var(--acc)}
+.hidden{display:none!important}
+.fc li{justify-content:space-between}
+.fc .n{font-weight:700;flex:1}
+.warn{background:#3b2a05;border:1px solid #a16207;color:#fde68a;border-radius:10px;padding:10px;margin:8px 0;font-size:14px}
+.qn{background:#1e1b4b;border:1px solid #6366f1;color:#c7d2fe;border-radius:10px;padding:10px;margin:8px 0;font-size:14px}
+/* エピデミック演出 */
+#epi{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:auto;padding:24px 16px}
+#epi.flash{animation:strobe .18s steps(2) 14}
+#epi .bg{position:fixed;inset:0;background:radial-gradient(circle at 50% 40%,#7f1d1d 0%,#1a0207 70%);z-index:-1}
+#epi .bg::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(0,0,0,.25) 0 22px,rgba(225,29,72,.12) 22px 44px);animation:slide 1.2s linear infinite}
+#epi .title{font-size:min(16vw,84px);font-weight:900;color:#fff;text-shadow:0 0 18px #ff1744,0 0 40px #ff1744;letter-spacing:.04em;animation:shake .08s infinite alternate,pulse 1s ease-in-out infinite}
+#epi .jp{font-size:22px;font-weight:800;color:#fecdd3;margin:4px 0 18px}
+#epi .steps{width:100%;max-width:480px;background:rgba(0,0,0,.55);border:1px solid #9f1239;border-radius:14px;padding:14px;opacity:0;animation:fadein .4s 1.6s forwards}
+#epi .steps ol{margin:0;padding-left:22px;line-height:1.7}
+#epi .steps li{margin-bottom:8px}
+#epi .steps .card{margin:6px 0}
+@keyframes strobe{0%{background:#fff}100%{background:transparent}}
+@keyframes shake{0%{transform:translate(-3px,2px) rotate(-1deg)}100%{transform:translate(3px,-2px) rotate(1deg)}}
+@keyframes pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.6)}}
+@keyframes slide{from{background-position:0 0}to{background-position:62px 0}}
+@keyframes fadein{to{opacity:1}}
+.pop{animation:pop .35s ease-out}
+@keyframes pop{0%{transform:scale(.8);opacity:0}100%{transform:scale(1);opacity:1}}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:40;display:flex;align-items:flex-end;justify-content:center}
+.modal .box{background:var(--panel);width:100%;max-width:560px;max-height:88vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+</style>
+</head>
+<body>
+
+<!-- 準備画面 -->
+<section id="setup">
+  <h1>パンデミック 2卓そろえ山札</h1>
+  <div class="panel">
+    <div class="muted">2つの卓で<b>同じ「合言葉」・同じ人数・同じエピデミック枚数</b>を入れると、プレイヤーカードと感染カードがまったく同じ順で出ます。</div>
+    <label>合言葉（シード）</label>
+    <div class="row"><input id="seed" autocomplete="off" autocapitalize="characters"><button class="sm" style="flex:0 0 auto" onclick="newSeed()">作る</button></div>
+    <label>人数</label>
+    <div class="seg" id="players"></div>
+    <label>エピデミックの枚数</label>
+    <div class="seg" id="epis"></div>
+    <label>プレイヤーの名前（手番の順・空なら「1番目」など）</label>
+    <div id="names"></div>
+    <details style="margin-top:12px"><summary class="muted">イベントカードの名前（手元のカードに合わせて変更可）</summary>
+      <textarea id="events"></textarea>
+      <div class="muted">1行に1枚。拡張のイベントを足すときもここに追加。2卓とも同じにすること。</div>
+    </details>
+  </div>
+  <button class="big" onclick="startGame()">この設定で始める</button>
+  <div class="panel" style="margin-top:12px">
+    <div class="muted">もう片方の卓には「共有」で送るか、合言葉・人数・枚数を同じに入れてください。</div>
+    <div class="row" style="margin-top:8px"><button onclick="shareSetup()">設定を共有（リンク）</button></div>
+  </div>
+</section>
+
+<!-- 進行画面 -->
+<section id="game" class="hidden">
+  <div id="v-play">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <div class="muted">合言葉 <b id="g-seed"></b> <button class="sm" style="padding:4px 10px;margin-left:4px" onclick="openShare()">共有</button></div>
+      <div style="text-align:right" class="muted">照合コード <span class="code" id="g-code"></span></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="s-deck"></b><span>プレイヤー山</span></div>
+      <div class="stat"><b id="s-epi"></b><span>エピ残り</span></div>
+      <div class="stat"><b id="s-rate"></b><span>感染率</span></div>
+      <div class="stat"><b id="s-inf"></b><span>感染山</span></div>
+    </div>
+    <div class="track" id="track"></div>
+    <div id="play-area"></div>
+  </div>
+  <div id="v-hist" class="hidden"></div>
+  <div id="v-inf" class="hidden"></div>
+  <div id="v-menu" class="hidden"></div>
+</section>
+
+<nav class="tabs hidden" id="tabs">
+  <button data-v="play" class="on">進行</button>
+  <button data-v="hist">履歴</button>
+  <button data-v="inf">感染捨て札</button>
+  <button data-v="menu">イベント他</button>
+</nav>
+
+<div id="epi" class="hidden"><div class="bg"></div><div class="title">EPIDEMIC</div><div class="jp">エピデミック発生！</div><div class="steps" id="epi-steps"></div></div>
+<div id="modal" class="modal hidden" onclick="if(event.target===this)closeModal()"><div class="box" id="modal-box"></div></div>
+
+<script>
+"use strict";
+// ===== カードの名前（識別用の文字だけ） =====
+const CITIES = {
+  blue:["サンフランシスコ","シカゴ","モントリオール","ニューヨーク","アトランタ","ワシントン","ロンドン","マドリード","パリ","エッセン","ミラノ","サンクトペテルブルク"],
+  yellow:["ロサンゼルス","メキシコシティ","マイアミ","ボゴタ","リマ","サンティアゴ","ブエノスアイレス","サンパウロ","ラゴス","キンシャサ","ヨハネスブルグ","ハルツーム"],
+  black:["アルジェ","カイロ","イスタンブール","モスクワ","バグダッド","リヤド","テヘラン","カラチ","ムンバイ","デリー","チェンナイ","コルカタ"],
+  red:["北京","ソウル","東京","上海","香港","台北","大阪","バンコク","ホーチミン","マニラ","ジャカルタ","シドニー"]
+};
+const COLOR_JP={blue:"青",yellow:"黄",black:"黒",red:"赤",event:"イベント",epi:"エピデミック"};
+const DEFAULT_EVENTS=["空輸","静かな一夜","予測","政府交付金","人口回復"];
+const RATES=[2,2,2,3,3,4,4];
+const HAND={2:4,3:3,4:2};
+const CITY_LIST=[];for(const c in CITIES)for(const n of CITIES[c])CITY_LIST.push({n,c});
+
+// ===== 乱数（合言葉から毎回同じ並びを作る） =====
+function hashStr(s){let h1=1779033703,h2=3144134277,h3=1013904242,h4=2773480762;for(let i=0;i<s.length;i++){const k=s.charCodeAt(i);h1=h2^Math.imul(h1^k,597399067);h2=h3^Math.imul(h2^k,2869860233);h3=h4^Math.imul(h3^k,951274213);h4=h1^Math.imul(h4^k,2716044559);}h1=Math.imul(h3^(h1>>>18),597399067);h2=Math.imul(h4^(h2>>>22),2869860233);h3=Math.imul(h1^(h3>>>17),951274213);h4=Math.imul(h2^(h4>>>19),2716044559);return (h1^h2^h3^h4)>>>0;}
+function rng(key){let a=hashStr(key);return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function shuffle(arr,r){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+// ===== 設定と状態 =====
+let cfg=null, actions=[], S=null, view="play";
+const LS="pandemic2table_v1";
+function save(){try{localStorage.setItem(LS,JSON.stringify({cfg,actions}));}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem(LS)||"null");return d;}catch(e){return null;}}
+
+function pname(i){const n=(cfg.names[i]||"").trim();return n||((i+1)+"番目の人");}
+
+function buildInitial(c){
+  const seed=c.seed.trim().toUpperCase();
+  const base=seed+"|"+c.players+"|"+c.epi+"|"+c.events.join(",");
+  const pr=rng(base+"|player");
+  const cards=CITY_LIST.map(x=>({n:x.n,c:x.c})).concat(c.events.map(n=>({n,c:"event"})));
+  let deck=shuffle(cards,pr);
+  // 最初の手札
+  const hands=[];const k=HAND[c.players];
+  for(let p=0;p<c.players;p++)hands.push([]);
+  for(let i=0;i<k;i++)for(let p=0;p<c.players;p++)hands[p].push(deck.shift());
+  // 残りをエピデミック枚数の山に分け、各山にエピデミックを1枚ずつランダムな位置に
+  const piles=[];const R=deck.length,E=c.epi,sz=Math.floor(R/E),extra=R%E;let pos=0;
+  for(let i=0;i<E;i++){const n=sz+(i<extra?1:0);const pile=deck.slice(pos,pos+n);pos+=n;
+    const at=Math.floor(pr()*(pile.length+1));pile.splice(at,0,{n:"エピデミック",c:"epi",no:i+1});piles.push(pile);}
+  const playerDeck=[].concat(...piles);
+  // 感染カード
+  const ir=rng(base+"|infect");
+  const inf=shuffle(CITY_LIST.map(x=>({n:x.n,c:x.c})),ir);
+  const setupInf=[];const disc=[];
+  [3,3,3,2,2,2,1,1,1].forEach(cub=>{const card=inf.shift();setupInf.push({card,cub});disc.push(card);});
+  return {base,hands,pileSizes:piles.map(p=>p.length),playerDeck,infDeck:inf,infDisc:disc,removed:[],setupInf,
+    rateIdx:0,epiDone:0,turn:1,cur:0,phase:"draw",drawnThisTurn:[],infThisTurn:0,quiet:false,quietUsed:false,
+    log:[],lastEpi:null,over:null};
+}
+
+function apply(st,a){
+  const L=(o)=>st.log.push(Object.assign({turn:st.turn,who:st.cur},o));
+  switch(a.t){
+    case "draw":{
+      if(st.phase!=="draw"||st.drawnThisTurn.length>=2)return;
+      if(st.playerDeck.length===0){st.over="プレイヤー山札が足りません（敗北条件）";return;}
+      const card=st.playerDeck.shift();st.drawnThisTurn.push(card);
+      if(card.c==="epi"){
+        st.epiDone++;st.rateIdx=Math.min(st.rateIdx+1,RATES.length-1);
+        const bottom=st.infDeck.pop();
+        st.infDisc.push(bottom);
+        const mixed=shuffle(st.infDisc,rng(st.base+"|intensify|"+st.epiDone));
+        st.infDeck=mixed.concat(st.infDeck);st.infDisc=[];
+        st.lastEpi={no:st.epiDone,bottom,mixedCount:mixed.length,rate:RATES[st.rateIdx],prevRate:RATES[Math.max(0,st.rateIdx-1)]};
+        L({k:"epi",card,bottom});
+      }else{L({k:"player",card});}
+      if(st.drawnThisTurn.length>=2)st.phase="infect";
+      break;}
+    case "inf":{
+      if(st.phase!=="infect")return;
+      if(st.quiet){return;}
+      if(st.infThisTurn>=RATES[st.rateIdx])return;
+      const card=st.infDeck.shift();if(!card)return;
+      st.infDisc.push(card);st.infThisTurn++;L({k:"inf",card});
+      break;}
+    case "quiet":{st.quiet=true;L({k:"event",msg:"静かな一夜（次の感染フェイズを飛ばす）"});break;}
+    case "unquiet":{st.quiet=false;L({k:"event",msg:"静かな一夜を取り消し"});break;}
+    case "forecast":{
+      const top=st.infDeck.slice(0,a.order.length);const rest=st.infDeck.slice(a.order.length);
+      const byKey={};top.forEach(c=>byKey[c.n]=c);
+      st.infDeck=a.order.map(n=>byKey[n]).concat(rest);
+      L({k:"event",msg:"予測："+a.order.join(" → ")});break;}
+    case "remove":{
+      const i=st.infDisc.findIndex(c=>c.n===a.n);if(i<0)return;
+      const [c]=st.infDisc.splice(i,1);st.removed.push(c);L({k:"event",msg:"人口回復："+c.n+" をゲームから除外"});break;}
+    case "next":{
+      if(st.phase!=="infect")return;
+      if(st.quiet){st.quiet=false;}
+      st.turn++;st.cur=(st.cur+1)%cfg.players;st.phase="draw";st.drawnThisTurn=[];st.infThisTurn=0;st.lastEpi=null;
+      break;}
+  }
+}
+function rebuild(){S=buildInitial(cfg);for(const a of actions)apply(S,a);}
+function act(a){actions.push(a);apply(S,a);save();render();syncAddr();}
+function syncAddr(){try{if(cfg)history.replaceState(null,"",setupLink(true));}catch(e){}}
+function undo(){if(!actions.length)return;actions.pop();rebuild();save();render();syncAddr();toast("1つ戻しました");}
+
+// 照合コード：今の山の並びから作る4文字。2卓で同じなら同じ順。
+function syncCode(){const s=S.playerDeck.map(c=>c.n).join("/")+"#"+S.infDeck.map(c=>c.n).join("/")+"#"+S.infDisc.map(c=>c.n).sort().join("/");
+  const h=hashStr(s).toString(36).toUpperCase().padStart(7,"0");return h.slice(-4);}
+
+// ===== 表示 =====
+const $=id=>document.getElementById(id);
+function cardHTML(card,extra="",kind=""){
+  const cls="c-"+card.c+(kind==="i"?" icard":"");
+  const tag=kind==="p"?'<span class="ptag">プレイヤーカード</span>':kind==="i"?'<span class="itag">感染カード（カードは取らない）</span>':"";
+  const chip=(kind&&card.c!=="epi")?`<span class="chip chip-${card.c}">${COLOR_JP[card.c]}</span>`:"";
+  return `<div class="card ${cls}">${tag}${chip}<div class="nm">${card.n}</div>${extra}</div>`;}
+function cube(n){return '<span class="cubes">'+"■".repeat(n)+"</span>";}
+
+function render(){
+  $("g-seed").textContent=cfg.seed.toUpperCase();
+  $("g-code").textContent=syncCode();
+  $("s-deck").textContent=S.playerDeck.length;
+  $("s-epi").textContent=cfg.epi-S.epiDone;
+  $("s-rate").textContent=RATES[S.rateIdx];
+  $("s-inf").textContent=S.infDeck.length;
+  $("track").innerHTML='感染率 '+RATES.map((r,i)=>`<span class="${i===S.rateIdx?'now':i<S.rateIdx?'past':''}">${r}</span>`).join("");
+  renderPlay();renderHist();renderInf();renderMenu();
+}
+
+function renderPlay(){
+  let h="";
+  if(actions.length===0){
+    h+=`<div class="panel"><h2 style="margin-top:0">最初の手札を配る</h2>`;
+    S.hands.forEach((hand,i)=>{h+=`<div style="margin:10px 0 4px"><b>${pname(i)}</b></div>`;hand.forEach(c=>h+=`<div><span class="dot d-${c.c}"></span>${c.n}</div>`);});
+    h+=`<h2>最初の感染（9枚）</h2>`;
+    S.setupInf.forEach(x=>h+=`<div><span class="dot d-${x.card.c}"></span>${x.card.n} ${cube(x.cub)}</div>`);
+    h+=`<div class="muted" style="margin-top:8px">山の分け方：${S.pileSizes.join("・")}枚（エピデミック込み、上から）</div></div>`;
+  }
+  if(S.over){h+=`<div class="warn">${S.over}</div>`;}
+  h+=`<div class="turn">第${S.turn}手番　<b>${pname(S.cur)}</b></div>`;
+  if(S.quiet)h+=`<div class="qn">静かな一夜：この手番の感染フェイズは飛ばします</div>`;
+  if(S.phase==="draw"){
+    S.drawnThisTurn.forEach(c=>h+=drawnCard(c));
+    const left=2-S.drawnThisTurn.length;
+    if(S.playerDeck.length<left)h+=`<div class="warn">山札が残り${S.playerDeck.length}枚。2枚引けないと敗北です。</div>`;
+    h+=`<button class="big" onclick="act({t:'draw'})">プレイヤーカードを引く（あと${left}枚）</button>`;
+  }else{
+    S.drawnThisTurn.forEach(c=>h+=drawnCard(c));
+    const need=RATES[S.rateIdx];
+    const got=S.log.filter(l=>l.turn===S.turn&&l.k==="inf").map(l=>l.card);
+    const rose=S.log.some(l=>l.turn===S.turn&&l.k==="epi")&&S.rateIdx>0&&RATES[S.rateIdx]>RATES[S.rateIdx-1];
+    if(rose)h+=`<div class="warn" style="background:#4c0519;border-color:#e11d48;color:#fecdd3">感染率が上がりました：この手番から <b>${need}枚</b></div>`;
+    h+=`<h2>感染カード（${S.infThisTurn}/${S.quiet?0:need}枚）</h2>`;
+    got.forEach(c=>h+=cardHTML(c,`<div class="to">${c.n} に病原体を1個置く</div>`,"i"));
+    if(!S.quiet&&S.infThisTurn<need){
+      h+=`<button class="big inf" onclick="act({t:'inf'})">感染カードを引く（${S.infThisTurn+1}/${need}）</button>`;
+    }else{
+      h+=`<button class="big next" onclick="act({t:'next'})">手番終わり → ${pname((S.cur+1)%cfg.players)}</button>`;
+    }
+  }
+  h+=`<div class="row" style="margin-top:14px"><button onclick="undo()" ${actions.length?"":"disabled"}>↶ 1つ戻す</button><button onclick="openForecast()">予測</button><button onclick="openRemove()">人口回復</button></div>`;
+  $("play-area").innerHTML=h;
+  const cs=$("play-area").querySelectorAll(".card");if(cs.length&&actions.length)cs[cs.length-1].classList.add("pop");
+}
+function drawnCard(c){
+  if(c.c==="epi")return cardHTML(c,`<div class="to">エピデミック ${c.no}枚目（${S.pileSizes.length}山中）</div>`);
+  return cardHTML(c,`<div class="to">${c.c==="event"?"イベントの束から":COLOR_JP[c.c]+"の束から"}探して → <b>${pname(S.cur)}</b> に渡す</div>`,"p");
+}
+
+function renderHist(){
+  let h=`<h1>出たカードの履歴</h1><div class="panel"><h2 style="margin-top:0">プレイヤーカード</h2><ul class="list">`;
+  const pl=S.log.filter(l=>l.k==="player"||l.k==="epi").slice().reverse();
+  if(!pl.length)h+=`<li class="muted">まだありません</li>`;
+  pl.forEach(l=>{if(l.k==="epi")h+=`<li class="epi"><span class="t">第${l.turn}手番</span><span class="dot d-epi"></span>エピデミック（最下段 ${l.bottom.n} に3個）</li>`;
+    else h+=`<li><span class="t">第${l.turn}手番</span><span class="dot d-${l.card.c}"></span>${l.card.n}<span class="muted" style="margin-left:auto">${pname(l.who)}</span></li>`;});
+  h+=`</ul></div><div class="panel"><h2 style="margin-top:0">感染カード・イベント</h2><ul class="list">`;
+  const il=S.log.filter(l=>l.k==="inf"||l.k==="event"||l.k==="epi").slice().reverse();
+  il.forEach(l=>{if(l.k==="inf")h+=`<li><span class="t">第${l.turn}手番</span><span class="dot d-${l.card.c}"></span>${l.card.n}</li>`;
+    else if(l.k==="epi")h+=`<li class="epi"><span class="t">第${l.turn}手番</span>エピデミック：${l.bottom.n} ${cube(3)}</li>`;
+    else h+=`<li><span class="t">第${l.turn}手番</span><span class="dot d-event"></span>${l.msg}</li>`;});
+  h+=`<li><span class="t">準備</span>${S.setupInf.map(x=>x.card.n+"×"+x.cub).join("、")}</li></ul></div>`;
+  h+=`<div class="panel"><h2 style="margin-top:0">最初の手札</h2>`;
+  S.hands.forEach((hand,i)=>h+=`<div><b>${pname(i)}</b>：${hand.map(c=>c.n).join("、")}</div>`);
+  h+=`</div>`;
+  $("v-hist").innerHTML=h;
+}
+function renderInf(){
+  let h=`<h1>感染の捨て札（${S.infDisc.length}枚）</h1><div class="panel"><ul class="list">`;
+  if(!S.infDisc.length)h+=`<li class="muted">空です（エピデミックで山の上に戻りました）</li>`;
+  const byC={};S.infDisc.forEach(c=>(byC[c.c]=byC[c.c]||[]).push(c));
+  ["blue","yellow","black","red"].forEach(col=>(byC[col]||[]).forEach(c=>h+=`<li><span class="dot d-${c.c}"></span>${c.n}</li>`));
+  h+=`</ul></div>`;
+  if(S.removed.length)h+=`<div class="panel"><h2 style="margin-top:0">ゲームから除外（人口回復）</h2>${S.removed.map(c=>`<div><span class="dot d-${c.c}"></span>${c.n}</div>`).join("")}</div>`;
+  h+=`<div class="muted">この一覧は次のエピデミックで山の上に戻る（＝これから出てくる）カードです。</div>`;
+  $("v-inf").innerHTML=h;
+}
+function renderMenu(){
+  let h=`<h1>イベント・その他</h1>
+  <div class="panel"><b>予測</b><div class="muted">感染山の上6枚を見て並べ替えます。</div><button style="width:100%;margin-top:8px" onclick="openForecast()">予測を使う</button></div>
+  <div class="panel"><b>人口回復</b><div class="muted">感染の捨て札から1枚選んでゲームから除外します。</div><button style="width:100%;margin-top:8px" onclick="openRemove()">人口回復を使う</button></div>
+  <div class="panel"><b>静かな一夜</b><div class="muted">次の感染フェイズを1回飛ばします。</div>
+   <button style="width:100%;margin-top:8px" onclick="act({t:S.quiet?'unquiet':'quiet'})">${S.quiet?"取り消す":"静かな一夜を使う"}</button></div>
+  <div class="panel"><div class="muted">空輸・政府交付金など山札に関係しないイベントは、アプリの操作は要りません。<br>イベントの使い方が2卓で違うと、その後の並びはずれます（照合コードで確認できます）。</div></div>
+  <div class="panel"><b>2卓のずれ確認</b><div class="muted">上の「照合コード」が2卓で同じなら、山札の残りの並びが同じです。</div></div>
+  <div class="panel"><button style="width:100%" onclick="undo()" ${actions.length?"":"disabled"}>↶ 1つ戻す</button>
+  <button style="width:100%;margin-top:8px" onclick="openShare()">共有（もう1卓・続きを別スマホへ）</button>
+  <button style="width:100%;margin-top:8px;color:#fca5a5" onclick="resetGame()">ゲームをやめて設定に戻る</button></div>`;
+  $("v-menu").innerHTML=h;
+}
+
+// 予測
+let fcOrder=[];
+function openForecast(){
+  fcOrder=S.infDeck.slice(0,6).map(c=>c.n);
+  if(!fcOrder.length){toast("感染山がありません");return;}
+  drawForecast();
+}
+function drawForecast(){
+  const col={};S.infDeck.slice(0,6).forEach(c=>col[c.n]=c.c);
+  let h=`<h2 style="margin-top:0">予測：感染山の上${fcOrder.length}枚</h2><div class="muted">上にあるほど先に出ます。矢印で並べ替えて「決定」。</div><ul class="list fc">`;
+  fcOrder.forEach((n,i)=>h+=`<li><span class="t">${i+1}枚目</span><span class="dot d-${col[n]}"></span><span class="n">${n}</span>
+   <button class="sm" onclick="fcMove(${i},-1)" ${i?"":"disabled"}>▲</button><button class="sm" onclick="fcMove(${i},1)" ${i<fcOrder.length-1?"":"disabled"}>▼</button></li>`);
+  h+=`</ul><div class="row" style="margin-top:12px"><button onclick="closeModal()">やめる</button><button class="on" onclick="closeModal();act({t:'forecast',order:fcOrder.slice()})">決定</button></div>`;
+  openModal(h);
+}
+function fcMove(i,d){const j=i+d;[fcOrder[i],fcOrder[j]]=[fcOrder[j],fcOrder[i]];drawForecast();}
+// 人口回復
+function openRemove(){
+  if(!S.infDisc.length){toast("感染の捨て札がありません");return;}
+  let h=`<h2 style="margin-top:0">人口回復：除外するカードを選ぶ</h2><ul class="list">`;
+  S.infDisc.forEach(c=>h+=`<li><span class="dot d-${c.c}"></span><span style="flex:1">${c.n}</span><button class="sm" onclick='closeModal();act({t:"remove",n:${JSON.stringify(c.n)}})'>除外</button></li>`);
+  h+=`</ul><button style="width:100%;margin-top:12px" onclick="closeModal()">やめる</button>`;
+  openModal(h);
+}
+function openModal(h){$("modal-box").innerHTML=h;$("modal").classList.remove("hidden");}
+function closeModal(){$("modal").classList.add("hidden");}
+
+// エピデミック演出
+function showEpidemic(e){
+  const el=$("epi");
+  $("epi-steps").innerHTML=`<ol>
+   <li><b>感染率を上げる</b>（マーカーを1つ右へ）→ これから1手番に <b>${e.rate}枚</b>${e.rate===e.prevRate?"（この段階では枚数は変わりません）":"（"+e.prevRate+"枚から増えました）"}</li>
+   <li><b>感染</b>：感染山の一番下のカード${cardHTML(e.bottom,`<div class="to">病原体を<b>3個</b>置く ${cube(3)}</div>`,"i")}</li>
+   <li><b>感染拡大</b>：捨て札${e.mixedCount}枚を混ぜて山の上へ（アプリが同じ順で混ぜました）</li></ol>
+   <button class="big" style="margin-top:12px" onclick="closeEpi()">確認した</button>`;
+  el.classList.remove("hidden");el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash");
+  try{navigator.vibrate&&navigator.vibrate([400,120,400,120,800]);}catch(_){}
+  siren();
+}
+function closeEpi(){$("epi").classList.add("hidden");stopSiren();}
+let actx=null,sirenNodes=null;
+function siren(){
+  try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const t=actx.currentTime;
+    const o=actx.createOscillator(),g=actx.createGain();o.type="sawtooth";
+    for(let i=0;i<6;i++){o.frequency.setValueAtTime(520,t+i*0.5);o.frequency.linearRampToValueAtTime(980,t+i*0.5+0.25);o.frequency.linearRampToValueAtTime(520,t+i*0.5+0.5);}
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.25,t+0.05);g.gain.setValueAtTime(0.25,t+2.8);g.gain.exponentialRampToValueAtTime(0.0001,t+3);
+    o.connect(g).connect(actx.destination);o.start(t);o.stop(t+3.05);sirenNodes=o;}catch(_){}
+}
+function stopSiren(){try{sirenNodes&&sirenNodes.stop();}catch(_){}sirenNodes=null;}
+
+// actの後にエピデミックなら演出
+const _act=act;
+act=function(a){const before=S.epiDone;_act(a);if(a.t==="draw"&&S.epiDone>before&&S.lastEpi)showEpidemic(S.lastEpi);};
+
+function toast(m){const d=document.createElement("div");d.textContent=m;d.style.cssText="position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#333;color:#fff;padding:10px 16px;border-radius:20px;z-index:60;font-size:14px";document.body.appendChild(d);setTimeout(()=>d.remove(),1600);}
+
+// ===== 準備画面 =====
+let selP=4,selE=5;
+function newSeed(){const ch="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let s="";const a=new Uint32Array(5);crypto.getRandomValues(a);a.forEach(x=>s+=ch[x%ch.length]);$("seed").value=s;}
+function drawSetup(){
+  $("players").innerHTML=[2,3,4].map(n=>`<button class="${n===selP?"on":""}" onclick="selP=${n};drawSetup()">${n}人</button>`).join("");
+  $("epis").innerHTML=[4,5,6].map(n=>`<button class="${n===selE?"on":""}" onclick="selE=${n};drawSetup()">${n}枚${n===4?"（入門）":n===5?"（標準）":"（英雄）"}</button>`).join("");
+  const cur=[...document.querySelectorAll("#names input")].map(i=>i.value);
+  $("names").innerHTML=Array.from({length:selP},(_,i)=>`<input style="margin-bottom:6px" placeholder="${i+1}番目の人" value="${(cur[i]||"").replace(/"/g,"&quot;")}">`).join("");
+}
+function readSetup(){
+  return {seed:$("seed").value.trim().toUpperCase(),players:selP,epi:selE,
+    names:[...document.querySelectorAll("#names input")].map(i=>i.value),
+    events:$("events").value.split(/\n/).map(s=>s.trim()).filter(Boolean)};
+}
+function startGame(){
+  const c=readSetup();if(!c.seed){newSeed();c.seed=$("seed").value;}
+  cfg=c;actions=[];rebuild();save();enterGame();
+}
+function enterGame(){setTimeout(syncAddr,0);$("setup").classList.add("hidden");$("game").classList.remove("hidden");$("tabs").classList.remove("hidden");setView("play");render();window.scrollTo(0,0);}
+function resetGame(){if(!confirmInline())return;}
+function confirmInline(){openModal(`<h2 style="margin-top:0">ゲームをやめますか？</h2><div class="muted">進行は消えます（同じ合言葉で始め直せば同じ順から出ます）。</div><div class="row" style="margin-top:12px"><button onclick="closeModal()">続ける</button><button style="color:#fca5a5" onclick="closeModal();doReset()">やめる</button></div>`);return false;}
+function doReset(){try{localStorage.removeItem(LS);history.replaceState(null,"",location.pathname);}catch(e){}cfg=null;actions=[];$("game").classList.add("hidden");$("tabs").classList.add("hidden");$("setup").classList.remove("hidden");}
+function setupLink(withProgress){const c=readSetupOrCfg();const u=new URL(location.href.split("?")[0].split("#")[0]);
+  u.searchParams.set("s",c.seed);u.searchParams.set("p",c.players);u.searchParams.set("e",c.epi);
+  if(c.events.join("\n")!==DEFAULT_EVENTS.join("\n"))u.searchParams.set("ev",c.events.join(","));
+  if(c.names&&c.names.some(x=>x&&x.trim()))u.searchParams.set("nm",c.names.map(x=>(x||"").trim()).join(","));
+  if(withProgress&&cfg)u.searchParams.set("a",encActions(actions));
+  return u.toString();}
+// 進行を短い文字にする（d=引く i=感染 n=次 q/u=静かな一夜 f=予測 r=人口回復）
+function cityIdx(n){return CITY_LIST.findIndex(x=>x.n===n);}
+function encActions(list){return list.map(a=>a.t==="draw"?"d":a.t==="inf"?"i":a.t==="next"?"n":a.t==="quiet"?"q":a.t==="unquiet"?"u":
+  a.t==="forecast"?"f"+a.order.map(cityIdx).join("."):a.t==="remove"?"r"+cityIdx(a.n):"").join("-");}
+function decActions(str){if(!str)return[];return str.split("-").filter(Boolean).map(t=>{const k=t[0],r=t.slice(1);
+  if(k==="d")return{t:"draw"};if(k==="i")return{t:"inf"};if(k==="n")return{t:"next"};if(k==="q")return{t:"quiet"};if(k==="u")return{t:"unquiet"};
+  if(k==="f")return{t:"forecast",order:r.split(".").map(i=>CITY_LIST[+i].n)};if(k==="r")return{t:"remove",n:CITY_LIST[+r].n};return null;}).filter(Boolean);}
+function openShare(){
+  const u1=setupLink(false),u2=setupLink(true);
+  openModal(`<h2 style="margin-top:0">共有</h2>
+   <div class="panel"><b>もう1卓に送る（最初から）</b><div class="muted">相手のスマホで開くと、同じ合言葉・人数・枚数が入った状態になります。「この設定で始める」を押すだけ。</div>
+    <div id="qr"></div>
+    <div class="row" style="margin-top:8px"><button onclick="shareUrl(${JSON.stringify(u1).replace(/"/g,"&quot;")},'もう1卓用')">送る</button><button onclick="copyUrl(${JSON.stringify(u1).replace(/"/g,"&quot;")})">コピー</button></div></div>
+   <div class="panel"><b>続きを別のスマホへ（今の進行ごと）</b><div class="muted">電池切れなどで持ちかえるとき用。開くと第${S?S.turn:1}手番のこの続きから始まります。</div>
+    <div class="row" style="margin-top:8px"><button onclick="shareUrl(${JSON.stringify(u2).replace(/"/g,"&quot;")},'続き')">送る</button><button onclick="copyUrl(${JSON.stringify(u2).replace(/"/g,"&quot;")})">コピー</button></div></div>
+   <button style="width:100%" onclick="closeModal()">閉じる</button>`);
+  makeQR(u1);
+}
+function makeQR(url){
+  const draw=()=>{try{const el=$("qr");if(!el)return;el.innerHTML="";new QRCode(el,{text:url,width:200,height:200,correctLevel:QRCode.CorrectLevel.M});}catch(e){}};
+  if(window.QRCode)return draw();
+  const sc=document.createElement("script");sc.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";sc.onload=draw;document.head.appendChild(sc);
+}
+function shareUrl(url,label){const c=readSetupOrCfg();const text=`パンデミック2卓（${label}） 合言葉:${c.seed} ${c.players}人 エピデミック${c.epi}枚`;
+  if(navigator.share)navigator.share({title:"2卓そろえ山札",text,url}).catch(()=>{});else copyUrl(url);}
+function copyUrl(url){try{navigator.clipboard.writeText(url).then(()=>toast("コピーしました"),()=>prompt("コピーしてください",url));}catch(e){prompt("コピーしてください",url);}}
+function readSetupOrCfg(){return cfg||readSetup();}
+function shareSetup(){
+  if(!cfg&&!$("seed").value.trim())newSeed();
+  if(cfg)return openShare();
+  const url=setupLink(false);const c=readSetupOrCfg();
+  const text=`パンデミック2卓 合言葉:${c.seed} ${c.players}人 エピデミック${c.epi}枚`;
+  if(navigator.share){navigator.share({title:"2卓そろえ山札",text,url}).catch(()=>{});}
+  else{openModal(`<h2 style="margin-top:0">設定を共有</h2><div class="muted">${text}</div><textarea readonly onclick="this.select()">${url}</textarea><button style="width:100%;margin-top:8px" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(url)});toast('コピーしました')">コピー</button><button style="width:100%;margin-top:8px" onclick="closeModal()">閉じる</button>`);}
+}
+function setView(v){view=v;["play","hist","inf","menu"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!==v));
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));window.scrollTo(0,0);}
+document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>setView(b.dataset.v));
+
+// 起動
+(function(){
+  $("events").value=DEFAULT_EVENTS.join("\n");
+  const q=new URLSearchParams(location.search);
+  const saved=load();
+  if(q.get("s")){
+    $("seed").value=q.get("s").toUpperCase();
+    selP=+q.get("p")||4;selE=+q.get("e")||5;if(q.get("ev"))$("events").value=q.get("ev").split(",").join("\n");
+    const nm=q.get("nm"),aq=q.get("a");
+    history.replaceState(null,"",location.pathname);
+    drawSetup();
+    if(nm){const ns=nm.split(",");document.querySelectorAll("#names input").forEach((el,i)=>el.value=ns[i]||"");}
+    if(aq!==null){cfg=readSetup();actions=decActions(aq);rebuild();save();enterGame();toast("続きから再開しました");return;}
+    if(saved&&saved.cfg&&saved.cfg.seed===$("seed").value&&saved.cfg.players===selP&&saved.cfg.epi===selE){cfg=saved.cfg;actions=saved.actions||[];rebuild();enterGame();}
+    return;
+  }
+  if(saved&&saved.cfg){cfg=saved.cfg;actions=saved.actions||[];selP=cfg.players;selE=cfg.epi;$("seed").value=cfg.seed;drawSetup();rebuild();enterGame();return;}
+  drawSetup();newSeed();
+})();
+</script>
+</body>
+</html>
