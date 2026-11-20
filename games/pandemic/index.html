@@ -333,7 +333,8 @@ function renderPlay(){
       h+=`<button class="big next" onclick="act({t:'next'})">手番終わり → ${pname((S.cur+1)%cfg.players)}</button>`;
     }
   }
-  h+=`<div class="row" style="margin-top:14px"><button onclick="undo()" ${actions.length?"":"disabled"}>↶ 1つ戻す</button><button onclick="openForecast()">予測</button><button onclick="openRemove()">人口回復</button></div>`;
+  h+=`<div class="row" style="margin-top:14px"><button onclick="openForecast()">予測</button><button onclick="openRemove()">人口回復</button><button onclick="act({t:S.quiet?'unquiet':'quiet'})"${S.infThisTurn>0?" disabled":""}${S.quiet?' style="background:#1e3a8a;border-color:#60a5fa"':''}>${S.quiet?"静かな一夜を取消":"静かな一夜"}</button></div>`;
+  h+=`<div class="row" style="margin-top:8px"><button onclick="undo()" ${actions.length?"":"disabled"}>↶ 1つ戻す</button></div>`;
   $("play-area").innerHTML=h;
   const last=actions[actions.length-1];
   const sel=last&&last.t==="draw"?".pc:not(.ph)":last&&last.t==="inf"?".card":null;
