@@ -226,7 +226,16 @@ function buildInitial(c){
 
 function apply(st,a){
   const L=(o)=>st.log.push(Object.assign({turn:st.turn,who:st.cur},o));
+  if(st.lastEpi&&["inf","forecast","remove","next"].includes(a.t))st.lastEpi.open=false;
   switch(a.t){
+    case "epiremove":{
+      const e=st.lastEpi;if(!e||!e.open)return;
+      const i=e.preDisc.findIndex(c=>c.n===a.n);if(i<0)return;
+      const [c]=e.preDisc.splice(i,1);st.removed.push(c);
+      const mixed=shuffle(e.preDisc,rng(st.base+"|intensify|"+st.epiDone));
+      st.infDeck=mixed.concat(st.infDeck.slice(e.mixedCount));
+      st.topSet=mixed.map(x=>x.n);e.mixed=mixed.slice();e.mixedCount=mixed.length;e.open=false;e.rp=c;
+      L({k:"event",msg:"人口回復（エピデミック中・混ぜる前）："+c.n+" をゲームから除外"});break;}
     case "draw":{
       if(st.phase!=="draw"||st.drawnThisTurn.length>=2)return;
       if(st.playerDeck.length===0){st.over="プレイヤー山札が足りません（敗北条件）";return;}
@@ -235,10 +244,11 @@ function apply(st,a){
         st.epiDone++;st.rateIdx=Math.min(st.rateIdx+1,RATES.length-1);
         const bottom=st.infDeck.pop();
         st.infDisc.push(bottom);
+        const preDisc=st.infDisc.slice();
         const mixed=shuffle(st.infDisc,rng(st.base+"|intensify|"+st.epiDone));
         st.infDeck=mixed.concat(st.infDeck);st.infDisc=[];
         st.topSet=mixed.map(c=>c.n);
-        st.lastEpi={no:st.epiDone,bottom,mixed:mixed.map(c=>c),mixedCount:mixed.length,rate:RATES[st.rateIdx],prevRate:RATES[Math.max(0,st.rateIdx-1)]};
+        st.lastEpi={no:st.epiDone,bottom,mixed:mixed.map(c=>c),mixedCount:mixed.length,preDisc,open:true,rate:RATES[st.rateIdx],prevRate:RATES[Math.max(0,st.rateIdx-1)]};
         L({k:"epi",card,bottom});
       }else{L({k:"player",card});}
       if(st.drawnThisTurn.length>=2)st.phase="infect";
@@ -313,6 +323,7 @@ function renderPlay(){
   }
   if(S.over){h+=`<div class="warn">${S.over}</div>`;}
   h+=`<div class="turn">第${S.turn}手番　<b>${pname(S.cur)}</b></div>`;
+  if(S.lastEpi&&S.lastEpi.open)h+=`<div class="qn" style="border-color:#22c55e;color:#bbf7d0">エピデミック直後：人口回復を使うなら、感染カードを引く前に下の「人口回復」を押してください（混ぜる前の捨て札から選べます）</div>`;
   if(S.quiet)h+=`<div class="qn">静かな一夜：この手番の感染フェイズは飛ばします</div>`;
   if(S.phase==="draw"){
     h+=pcardsHTML();
@@ -405,6 +416,11 @@ function drawForecast(){
 function fcMove(i,d){const j=i+d;[fcOrder[i],fcOrder[j]]=[fcOrder[j],fcOrder[i]];drawForecast();}
 // 人口回復
 function openRemove(){
+  if(S.lastEpi&&S.lastEpi.open){
+    let h=`<h2 style="margin-top:0">人口回復（エピデミック中）</h2><div class="muted">混ぜて山の上に戻す前の捨て札${S.lastEpi.preDisc.length}枚から、1枚選んでゲームから除外します。残りを混ぜ直して山の上に戻します。</div><ul class="list">`;
+    ["blue","yellow","black","red"].forEach(col=>S.lastEpi.preDisc.filter(c=>c.c===col).forEach(c=>h+=`<li><span class="dot d-${c.c}"></span><span style="flex:1">${c.n}</span><button class="sm" onclick='closeModal();closeEpi();act({t:"epiremove",n:${JSON.stringify(c.n)}});toast(${JSON.stringify(c.n+" を除外して混ぜ直しました")})'>除外</button></li>`));
+    h+=`</ul><button style="width:100%;margin-top:12px" onclick="closeModal()">やめる</button>`;
+    openModal(h);return;}
   if(!S.infDisc.length){toast("感染の捨て札がありません");return;}
   let h=`<h2 style="margin-top:0">人口回復：除外するカードを選ぶ</h2><ul class="list">`;
   S.infDisc.forEach(c=>h+=`<li><span class="dot d-${c.c}"></span><span style="flex:1">${c.n}</span><button class="sm" onclick='closeModal();act({t:"remove",n:${JSON.stringify(c.n)}})'>除外</button></li>`);
@@ -422,6 +438,7 @@ function showEpidemic(e){
    <li><b>感染</b>：感染山の一番下のカード${cardHTML(e.bottom,`<div class="to">病原体を<b>3個</b>置く ${cube(3)}</div>`,"i")}</li>
    <li><b>感染拡大</b>：今までの感染の捨て札${e.mixedCount}枚（今の${e.bottom.n}も入れて）を混ぜて、感染山の<b>上</b>に戻しました。次からの感染はこの中から出ます。
    <div style="margin-top:6px;font-size:14px;line-height:1.8">${["blue","yellow","black","red"].map(col=>e.mixed.filter(c=>c.c===col).map(c=>`<span style="white-space:nowrap;margin-right:10px"><span class="dot d-${c.c}"></span>${c.n}</span>`).join("")).join("")}</div></li></ol>
+   ${e.open?`<button style="width:100%;margin-top:12px;border-color:#22c55e;color:#bbf7d0" onclick="closeEpi();openRemove()">ここで人口回復を使う（混ぜる前に1枚除外）</button>`:""}
    <button class="big" style="margin-top:12px" onclick="closeEpi()">確認した</button>`;
   el.classList.remove("hidden");el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash");
   try{navigator.vibrate&&navigator.vibrate([400,120,400,120,800]);}catch(_){}
@@ -472,13 +489,13 @@ function setupLink(withProgress){const c=readSetupOrCfg();const u=new URL(locati
   if(c.names&&c.names.some(x=>x&&x.trim()))u.searchParams.set("nm",c.names.map(x=>(x||"").trim()).join(","));
   if(withProgress&&cfg)u.searchParams.set("a",encActions(actions));
   return u.toString();}
-// 進行を短い文字にする（d=引く i=感染 n=次 q/u=静かな一夜 f=予測 r=人口回復）
+// 進行を短い文字にする（d=引く i=感染 n=次 q/u=静かな一夜 f=予測 r=人口回復 R=エピデミック中の人口回復）
 function cityIdx(n){return CITY_LIST.findIndex(x=>x.n===n);}
 function encActions(list){return list.map(a=>a.t==="draw"?"d":a.t==="inf"?"i":a.t==="next"?"n":a.t==="quiet"?"q":a.t==="unquiet"?"u":
-  a.t==="forecast"?"f"+a.order.map(cityIdx).join("."):a.t==="remove"?"r"+cityIdx(a.n):"").join("-");}
+  a.t==="forecast"?"f"+a.order.map(cityIdx).join("."):a.t==="remove"?"r"+cityIdx(a.n):a.t==="epiremove"?"R"+cityIdx(a.n):"").join("-");}
 function decActions(str){if(!str)return[];return str.split("-").filter(Boolean).map(t=>{const k=t[0],r=t.slice(1);
   if(k==="d")return{t:"draw"};if(k==="i")return{t:"inf"};if(k==="n")return{t:"next"};if(k==="q")return{t:"quiet"};if(k==="u")return{t:"unquiet"};
-  if(k==="f")return{t:"forecast",order:r.split(".").map(i=>CITY_LIST[+i].n)};if(k==="r")return{t:"remove",n:CITY_LIST[+r].n};return null;}).filter(Boolean);}
+  if(k==="f")return{t:"forecast",order:r.split(".").map(i=>CITY_LIST[+i].n)};if(k==="r")return{t:"remove",n:CITY_LIST[+r].n};if(k==="R")return{t:"epiremove",n:CITY_LIST[+r].n};return null;}).filter(Boolean);}
 function openShare(){
   const u1=setupLink(false),u2=setupLink(true);
   openModal(`<h2 style="margin-top:0">共有</h2>
